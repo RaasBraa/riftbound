@@ -11,17 +11,17 @@ Do not open `index.html` as a file. Serve this folder, then visit the local URL:
 - VS Code / Cursor: install Live Server and click Go Live
 - Or any static server pointed at this project root
 
-## Private vault login
+## Browse vs editing
 
-The GitHub Pages site opens on a login screen. The vault key is stored as a hash in `config.js`, not as plain text.
+Anyone can open the site and see Ras's collection. **+ / −**, import, and export stay locked until you click **Unlock editing** and enter the vault key.
 
-To change the key, put a new hash in `config.js`:
+The key hash lives in `config.js`. To change it:
 
 ```bash
 python -c "import hashlib; print(hashlib.sha256(('ras-brandt-riftbound-vault'+'YOURPASSWORD').encode()).hexdigest())"
 ```
 
-Then replace `passwordHash` and push. This keeps casual visitors out. It is still a static site, so it is not bank-grade security.
+Edits are saved in this browser. To update what visitors see, export `collection.json`, replace `data/collection.json`, and push.
 
 ## Track your collection
 

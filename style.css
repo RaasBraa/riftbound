@@ -107,16 +107,15 @@ a {
 }
 
 .login-gate {
-    position: relative;
-    z-index: 2;
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    padding: 1.5rem;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    max-width: calc(100vw - 2rem);
+    margin: auto;
 }
 
-body.is-open .login-gate {
-    display: none;
+.login-gate::backdrop {
+    background: rgba(4, 3, 6, 0.8);
 }
 
 .login-card {
@@ -264,6 +263,19 @@ h1 {
 #loginForm button[type="submit"]:hover {
     transform: translateY(-1px);
     filter: brightness(1.06);
+}
+
+#loginCancel {
+    width: 100%;
+    justify-content: center;
+}
+
+body:not(.can-edit) .editor-only {
+    display: none;
+}
+
+.qty.is-readonly {
+    padding: 0.25rem 0.55rem;
 }
 
 .login-error {

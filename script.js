@@ -26,13 +26,16 @@ const els = {
   password: document.getElementById("password"),
   remember: document.getElementById("rememberDevice"),
   app: document.getElementById("app"),
-  logout: document.getElementById("logout"),
+  vaultToggle: document.getElementById("vaultToggle"),
+  loginCancel: document.getElementById("loginCancel"),
 };
 
 const state = {
   cards: [],
   sets: [],
-  collection: loadCollection(),
+  publicCollection: {},
+  collection: {},
+  booted: false,
   filters: {
     set: "all",
     type: "all",
@@ -77,20 +80,33 @@ function clearAuth() {
   localStorage.removeItem(AUTH_KEY);
 }
 
-function openVault() {
-  document.body.classList.remove("is-locked");
-  document.body.classList.add("is-open");
-  els.loginGate.hidden = true;
-  els.app.hidden = false;
+function openLogin() {
+  els.loginError.hidden = true;
+  els.password.value = "";
+  els.loginGate.showModal();
+  els.password.focus();
 }
 
-function lockVault() {
-  clearAuth();
-  document.body.classList.add("is-locked");
-  document.body.classList.remove("is-open");
-  els.app.hidden = true;
-  els.loginGate.hidden = false;
+function applyEditMode() {
+  const editing = isAuthed();
+  document.body.classList.toggle("can-edit", editing);
+  els.vaultToggle.textContent = editing ? "Lock editing" : "Unlock editing";
+
+  if (editing) {
+    const local = loadCollection();
+    state.collection = Object.keys(local).length ? local : { ...state.publicCollection };
+    if (!Object.keys(local).length) saveCollection();
+  } else {
+    state.collection = { ...state.publicCollection };
+  }
+
+  if (state.booted) renderCards();
   if (els.modal.open) els.modal.close();
+}
+
+function lockEditing() {
+  clearAuth();
+  applyEditMode();
 }
 
 async function verifyPassword(password) {
@@ -173,18 +189,18 @@ function matchCsvRow(row) {
   return scored[0].card;
 }
 
-function applyCsvRows(rows, { onlyIfEmpty = false, replace = false } = {}) {
-  if (onlyIfEmpty && Object.keys(state.collection).length) return 0;
+function applyCsvRows(rows, { onlyIfEmpty = false, replace = false, target = state.collection } = {}) {
+  if (onlyIfEmpty && Object.keys(target).length) return 0;
   let applied = 0;
   for (const row of rows) {
     const card = matchCsvRow(row);
     const amount = Number(row.quantity || 0);
     if (!card || amount < 0) continue;
-    state.collection[card.id] = replace ? amount : (state.collection[card.id] || 0) + amount;
-    if (state.collection[card.id] === 0) delete state.collection[card.id];
+    target[card.id] = replace ? amount : (target[card.id] || 0) + amount;
+    if (target[card.id] === 0) delete target[card.id];
     applied += 1;
   }
-  if (applied) saveCollection();
+  if (applied && target === state.collection) saveCollection();
   return applied;
 }
 
@@ -280,14 +296,16 @@ function cardTile(card) {
   const button = document.createElement("article");
   button.className = `card-tile${ownedCount ? " owned" : ""}`;
   button.dataset.id = card.id;
+  const canEdit = isAuthed();
+  const showQty = canEdit || ownedCount > 0;
   button.innerHTML = `
     <div class="art-wrap ${card.orientation === "landscape" ? "landscape" : ""}">
       <img src="${imageUrl(card.image, 360)}" alt="${card.name}" loading="lazy" width="360" height="500">
-      <div class="qty">
-        <button type="button" data-delta="-1" aria-label="Remove one ${card.name}">−</button>
+      ${showQty ? `<div class="qty${canEdit ? "" : " is-readonly"}">
+        ${canEdit ? `<button type="button" data-delta="-1" aria-label="Remove one ${card.name}">−</button>` : ""}
         <span>${ownedCount}</span>
-        <button type="button" data-delta="1" aria-label="Add one ${card.name}">+</button>
-      </div>
+        ${canEdit ? `<button type="button" data-delta="1" aria-label="Add one ${card.name}">+</button>` : ""}
+      </div>` : ""}
     </div>
     <div class="card-meta">
       <strong>${card.name}</strong>
@@ -334,12 +352,13 @@ function openModal(card) {
       <div class="facts">${card.domains.map((domain) => `<span class="domain-pip">${domain}</span>`).join("")}</div>
       <p class="rules">${card.text || card.effect || "No rules text."}</p>
       ${card.illustrator?.length ? `<p class="rules">Art: ${card.illustrator.join(", ")}</p>` : ""}
+      ${isAuthed() ? `
       <div class="modal-qty qty" data-id="${card.id}">
         <button type="button" data-delta="-1">−</button>
         <span>${ownedCount}</span>
         <button type="button" data-delta="1">+</button>
         <small>copies owned</small>
-      </div>
+      </div>` : `<p class="rules">${ownedCount} ${ownedCount === 1 ? "copy" : "copies"} in Ras's collection</p>`}
     </div>
   `;
   els.modal.showModal();
@@ -373,6 +392,15 @@ function exportCollection() {
       `${slugify(card.name)}-${slugify(card.set)}${alt ? "-a" : ""}${overnumbered ? "-o" : ""}.avif`,
     ]);
   }
+  const json = JSON.stringify(state.collection, null, 2);
+  const jsonBlob = new Blob([json], { type: "application/json" });
+  const jsonUrl = URL.createObjectURL(jsonBlob);
+  const jsonLink = document.createElement("a");
+  jsonLink.href = jsonUrl;
+  jsonLink.download = "collection.json";
+  jsonLink.click();
+  URL.revokeObjectURL(jsonUrl);
+
   const csv = rows.map((row) => row.join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -404,11 +432,22 @@ async function boot() {
 
   try {
     const csvText = await fetch("riftbound/cards.csv").then((res) => (res.ok ? res.text() : ""));
-    if (csvText) applyCsvRows(parseCsv(csvText), { onlyIfEmpty: true });
+    if (csvText) applyCsvRows(parseCsv(csvText), { target: state.publicCollection });
   } catch {
-    // CSV is optional; collection can live entirely in the browser.
+    // Public CSV is optional if collection.json is present.
   }
 
+  try {
+    const published = await fetch("data/collection.json").then((res) => (res.ok ? res.json() : null));
+    if (published && typeof published === "object" && Object.keys(published).length) {
+      state.publicCollection = { ...state.publicCollection, ...published };
+    }
+  } catch {
+    // collection.json is optional until the first export is published.
+  }
+
+  applyEditMode();
+  state.booted = true;
   els.status.hidden = true;
   renderCards();
 }
@@ -488,19 +527,18 @@ els.loginForm.addEventListener("submit", async (event) => {
     return;
   }
   persistAuth(els.remember.checked);
-  openVault();
-  boot().catch((error) => {
-    els.status.hidden = false;
-    els.status.textContent = `${error.message}. Refresh and try again.`;
-  });
+  els.loginGate.close();
+  applyEditMode();
 });
 
-els.logout.addEventListener("click", lockVault);
+els.loginCancel.addEventListener("click", () => els.loginGate.close());
 
-if (isAuthed()) {
-  openVault();
-  boot().catch((error) => {
-    els.status.hidden = false;
-    els.status.textContent = `${error.message}. Refresh and try again.`;
-  });
-}
+els.vaultToggle.addEventListener("click", () => {
+  if (isAuthed()) lockEditing();
+  else openLogin();
+});
+
+boot().catch((error) => {
+  els.status.hidden = false;
+  els.status.textContent = `${error.message}. Refresh and try again.`;
+});
