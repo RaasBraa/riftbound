@@ -1,0 +1,9 @@
+gallery.html
+gallery.json
+next_data_keys.json
+.DS_Store
+Thumbs.db
+*.pyc
+__pycache__/
+.vscode/
+.idea/

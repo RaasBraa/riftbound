@@ -1,140 +1,409 @@
-const searchBar = document.querySelector(".searchBar");
-const cardRow = document.getElementById("cardRow");
-const noResults = document.getElementById("noResults");
-const totalCardCount = document.getElementById("totalCardCount");
-const filterButtons = document.querySelectorAll(".filter-button");
-let allCards = [];
-let activeFilter = "All";
+const STORAGE_KEY = "riftbound-collection-v1";
+const RARITY_RANK = { common: 1, uncommon: 2, rare: 3, epic: 4, showcase: 5 };
+const TYPES = ["Unit", "Spell", "Gear", "Legend", "Rune", "Battlefield"];
+const DOMAINS = ["Fury", "Calm", "Mind", "Body", "Chaos", "Order", "Colorless"];
+const RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Showcase"];
 
-fetch("riftbound/cards.csv")
-  .then((response) => response.text())
-  .then((csvText) => {
-    allCards = parseCSV(csvText);
-    renderCards(allCards);
-    updateTotalCardCount(allCards);
-  })
-  .catch((error) => {
-    console.error("Error loading CSV:", error);
-  });
+const els = {
+  search: document.getElementById("search"),
+  sort: document.getElementById("sort"),
+  grid: document.getElementById("cardGrid"),
+  empty: document.getElementById("empty"),
+  status: document.getElementById("status"),
+  modal: document.getElementById("cardModal"),
+  modalBody: document.getElementById("modalBody"),
+  catalog: document.getElementById("statCatalog"),
+  owned: document.getElementById("statOwned"),
+  copies: document.getElementById("statCopies"),
+  shown: document.getElementById("statShown"),
+  exportBtn: document.getElementById("exportCollection"),
+  importCsv: document.getElementById("importCsv"),
+};
 
-function parseCSV(csvText) {
-  const lines = csvText.trim().split("\n");
-  const headers = lines[0].split(",").map((header) => header.trim());
+const state = {
+  cards: [],
+  sets: [],
+  collection: loadCollection(),
+  filters: {
+    set: "all",
+    type: "all",
+    domain: "all",
+    rarity: "all",
+    view: "all",
+    query: "",
+    sort: "number",
+  },
+};
 
+function loadCollection() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveCollection() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.collection));
+}
+
+function qty(id) {
+  return Number(state.collection[id] || 0);
+}
+
+function setQty(id, next) {
+  const value = Math.max(0, Number(next) || 0);
+  if (value === 0) delete state.collection[id];
+  else state.collection[id] = value;
+  saveCollection();
+}
+
+function imageUrl(url, width) {
+  if (!url) return "";
+  const base = url.split("?")[0];
+  return `${base}?accountingTag=RB&w=${width}&fit=max&auto=format`;
+}
+
+function slugify(text) {
+  return String(text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function parseCsv(text) {
+  const lines = text.replace(/^\uFEFF/, "").trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.trim());
   return lines.slice(1).map((line) => {
     const values = line.split(",");
-    const card = {};
-
-    headers.forEach((header, index) => {
-      card[header] = values[index]?.trim() || "";
+    const row = {};
+    headers.forEach((header, i) => {
+      row[header] = (values[i] || "").trim();
     });
-
-    card.altArt = (card.altArt || "false").toLowerCase() === "true";
-    card.overnumbered = (card.overnumbered || "false").toLowerCase() === "true";
-
-    return card;
+    return row;
   });
 }
 
-function renderCards(cards) {
-  const filteredCards = cards.filter((card) => {
-    const matchesType = activeFilter === "All" || card.type.toLowerCase() === activeFilter.toLowerCase();
-    const searchText = searchBar.value.toLowerCase().trim();
+function matchCsvRow(row) {
+  const name = (row.name || "").toLowerCase();
+  const set = (row.set || "").toUpperCase();
+  const candidates = state.cards.filter(
+    (card) => card.name.toLowerCase() === name && card.set === set
+  );
+  if (!candidates.length) return null;
 
-    const matchesSearch = searchText === "" ||
-      `${card.name} ${card.set} ${card.type} ${card.color} ${card.altArt ? "alt art" : ""} ${card.overnumbered ? "overnumbered" : ""}`.toLowerCase().includes(searchText);
+  const alt = String(row.altArt || "").toLowerCase() === "true";
+  const overnumbered = String(row.overnumbered || "").toLowerCase() === "true";
+  const scored = candidates.map((card) => {
+    const code = (card.code || "").toLowerCase();
+    const looksAlt = /[a-z]/.test((card.id.split("-")[1] || "").replace(/\d+/g, "")) || /a\b/.test(code);
+    const looksOver = code.includes("*") || card.number > 300;
+    let score = 0;
+    if (alt === looksAlt) score += 2;
+    if (overnumbered === looksOver) score += 2;
+    return { card, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].card;
+}
 
-    return matchesType && matchesSearch;
+function applyCsvRows(rows, { onlyIfEmpty = false, replace = false } = {}) {
+  if (onlyIfEmpty && Object.keys(state.collection).length) return 0;
+  let applied = 0;
+  for (const row of rows) {
+    const card = matchCsvRow(row);
+    const amount = Number(row.quantity || 0);
+    if (!card || amount < 0) continue;
+    state.collection[card.id] = replace ? amount : (state.collection[card.id] || 0) + amount;
+    if (state.collection[card.id] === 0) delete state.collection[card.id];
+    applied += 1;
+  }
+  if (applied) saveCollection();
+  return applied;
+}
+
+function chipButton(label, active, attrs = {}) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `chip${active ? " active" : ""}`;
+  btn.textContent = label;
+  Object.entries(attrs).forEach(([key, value]) => btn.setAttribute(key, value));
+  return btn;
+}
+
+function renderFilterGroup(containerId, values, current, attrName, allLabel = "All") {
+  const group = document.getElementById(containerId);
+  group.replaceChildren();
+  group.append(chipButton(allLabel, current === "all", { [`data-${attrName}`]: "all" }));
+  values.forEach((value) => {
+    const id = typeof value === "string" ? value : value.id;
+    const label = typeof value === "string" ? value : value.name;
+    group.append(
+      chipButton(label, current === id, {
+        [`data-${attrName}`]: id,
+        ...(attrName === "domain" ? { "data-domain": id } : {}),
+      })
+    );
+  });
+}
+
+function renderFilters() {
+  renderFilterGroup("setFilters", state.sets, state.filters.set, "set", "All sets");
+  renderFilterGroup("typeFilters", TYPES, state.filters.type, "type", "All types");
+  renderFilterGroup("domainFilters", DOMAINS, state.filters.domain, "domain", "All domains");
+  renderFilterGroup("rarityFilters", RARITIES, state.filters.rarity, "rarity", "All rarities");
+}
+
+function filteredCards() {
+  const q = state.filters.query.trim().toLowerCase();
+  const rarityOrder = RARITY_RANK;
+
+  const list = state.cards.filter((card) => {
+    if (state.filters.set !== "all" && card.set !== state.filters.set) return false;
+    if (state.filters.type !== "all" && !card.types.includes(state.filters.type)) return false;
+    if (state.filters.domain !== "all" && !card.domains.includes(state.filters.domain)) return false;
+    if (state.filters.rarity !== "all" && card.rarity !== state.filters.rarity) return false;
+
+    const owned = qty(card.id) > 0;
+    if (state.filters.view === "owned" && !owned) return false;
+    if (state.filters.view === "missing" && owned) return false;
+
+    if (!q) return true;
+    const haystack = [
+      card.name,
+      card.code,
+      card.set,
+      card.setName,
+      card.rarity,
+      ...(card.types || []),
+      ...(card.domains || []),
+      ...(card.tags || []),
+      card.text,
+      card.effect,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(q);
   });
 
-  const sortedCards = sortCardsByNumber(filteredCards);
+  const sort = state.filters.sort;
+  list.sort((a, b) => {
+    if (sort === "name") return a.name.localeCompare(b.name);
+    if (sort === "set") return a.set.localeCompare(b.set) || a.number - b.number;
+    if (sort === "energy") return (a.energy ?? 99) - (b.energy ?? 99) || a.name.localeCompare(b.name);
+    if (sort === "might") return (b.might ?? -1) - (a.might ?? -1) || a.name.localeCompare(b.name);
+    if (sort === "rarity") {
+      return (rarityOrder[b.rarityId] || 0) - (rarityOrder[a.rarityId] || 0) || a.number - b.number;
+    }
+    return a.set.localeCompare(b.set) || a.number - b.number || a.name.localeCompare(b.name);
+  });
+  return list;
+}
 
-  if (sortedCards.length === 0) {
-    cardRow.innerHTML = "";
-    noResults.style.display = "block";
-    return;
-  }
+function updateStats(shownCount) {
+  const ownedIds = Object.keys(state.collection).filter((id) => qty(id) > 0);
+  const copies = ownedIds.reduce((sum, id) => sum + qty(id), 0);
+  els.catalog.textContent = String(state.cards.length);
+  els.owned.textContent = String(ownedIds.length);
+  els.copies.textContent = String(copies);
+  els.shown.textContent = String(shownCount);
+}
 
-  noResults.style.display = "none";
-
-  cardRow.innerHTML = sortedCards.map((card) => {
-    const flags = [];
-    if (card.altArt) flags.push("Alt Art");
-    if (card.overnumbered) flags.push("Overnumbered");
-
-    return `
-      <div class="col-6 col-md-4 col-lg-3 card-wrapper"
-           data-name="${card.name.toLowerCase()}"
-           data-set="${card.set.toLowerCase()}"
-           data-type="${card.type.toLowerCase()}"
-           data-color="${(card.color || "").toLowerCase()}">
-        <div class="card-custom">
-          <img src="riftbound-images/${card.image}" class="card-img${(card.type||'').toLowerCase() === 'battlefield' ? ' rotate-90' : ''}" alt="${card.name}">
-        </div>
-        <div class="card-caption">
-          <strong>${card.name}</strong><br>
-          Quantity: ${card.quantity}<br>
-          Type: ${card.type}${flags.length ? `<br>${flags.join(" | ")}` : ""}
-        </div>
+function cardTile(card) {
+  const ownedCount = qty(card.id);
+  const button = document.createElement("article");
+  button.className = `card-tile${ownedCount ? " owned" : ""}`;
+  button.dataset.id = card.id;
+  button.innerHTML = `
+    <div class="art-wrap ${card.orientation === "landscape" ? "landscape" : ""}">
+      <img src="${imageUrl(card.image, 360)}" alt="${card.name}" loading="lazy" width="360" height="500">
+      <div class="qty">
+        <button type="button" data-delta="-1" aria-label="Remove one ${card.name}">−</button>
+        <span>${ownedCount}</span>
+        <button type="button" data-delta="1" aria-label="Add one ${card.name}">+</button>
       </div>
-    `;
-  }).join("");
+    </div>
+    <div class="card-meta">
+      <strong>${card.name}</strong>
+      <small>${card.code} · ${card.types.join(", ")}</small>
+    </div>
+  `;
+  return button;
 }
 
-function sortCardsByNumber(cards) {
-  if (activeFilter === "All") {
-    const typePriority = {
-      unit: 1,
-      spell: 2,
-      legend: 3,
-      rune: 4,
-      gear: 5,
-      battlefield: 6,
-      token: 7,
-    };
+function renderCards() {
+  const cards = filteredCards();
+  updateStats(cards.length);
+  els.empty.hidden = cards.length > 0;
+  els.grid.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  cards.forEach((card) => fragment.append(cardTile(card)));
+  els.grid.append(fragment);
+}
 
-    return [...cards].sort((a, b) => {
-      const colorA = (a.color || "").split("&")[0].trim().toLowerCase();
-      const colorB = (b.color || "").split("&")[0].trim().toLowerCase();
-      if (colorA !== colorB) {
-        return colorA.localeCompare(colorB);
-      }
+function openModal(card) {
+  const ownedCount = qty(card.id);
+  const facts = [
+    card.code,
+    card.setName,
+    card.rarity,
+    ...card.types,
+    ...card.superTypes,
+    card.energy != null ? `Energy ${card.energy}` : null,
+    card.might != null ? `Might ${card.might}` : null,
+    card.power != null ? `Power ${card.power}` : null,
+    card.mightBonus ? `Bonus ${card.mightBonus}` : null,
+    ...card.tags,
+  ].filter(Boolean);
 
-      const typeA = (a.type || "").toLowerCase();
-      const typeB = (b.type || "").toLowerCase();
-      const priorityA = typePriority[typeA] ?? 99;
-      const priorityB = typePriority[typeB] ?? 99;
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
+  els.modalBody.innerHTML = `
+    <img src="${imageUrl(card.image, 744)}" alt="${card.name}">
+    <div class="modal-copy">
+      <h2>${card.name}</h2>
+      <div class="facts">${facts.map((fact) => `<span>${fact}</span>`).join("")}</div>
+      <div class="facts">${card.domains.map((domain) => `<span class="domain-pip">${domain}</span>`).join("")}</div>
+      <p class="rules">${card.text || card.effect || "No rules text."}</p>
+      ${card.illustrator?.length ? `<p class="rules">Art: ${card.illustrator.join(", ")}</p>` : ""}
+      <div class="modal-qty qty" data-id="${card.id}">
+        <button type="button" data-delta="-1">−</button>
+        <span>${ownedCount}</span>
+        <button type="button" data-delta="1">+</button>
+        <small>copies owned</small>
+      </div>
+    </div>
+  `;
+  els.modal.showModal();
+}
 
-      return a.name.localeCompare(b.name);
-    });
-  }
-
-  return [...cards].sort((a, b) => {
-    return a.name.localeCompare(b.name);
+function bindChipGroup(id, key) {
+  document.getElementById(id).addEventListener("click", (event) => {
+    const btn = event.target.closest(`[data-${key}]`);
+    if (!btn) return;
+    state.filters[key] = btn.getAttribute(`data-${key}`);
+    renderFilters();
+    renderCards();
   });
 }
 
-function updateTotalCardCount(cards) {
-  const total = cards.reduce((sum, card) => {
-    const qty = parseInt(card.quantity, 10);
-    return sum + (isNaN(qty) ? 0 : qty);
-  }, 0);
-
-  totalCardCount.textContent = `Total Cards: ${total}`;
+function exportCollection() {
+  const rows = [["name", "set", "quantity", "type", "color", "altArt", "overnumbered", "image"]];
+  for (const card of state.cards) {
+    const amount = qty(card.id);
+    if (!amount) continue;
+    const alt = /a\b/i.test(card.code) || (card.id.match(/-\d+[a-z]/) != null);
+    const overnumbered = (card.code || "").includes("*");
+    rows.push([
+      card.name,
+      card.set,
+      amount,
+      (card.types[0] || "").toUpperCase(),
+      card.domains.map((d) => d.toUpperCase()).join("&"),
+      String(alt),
+      String(overnumbered),
+      `${slugify(card.name)}-${slugify(card.set)}${alt ? "-a" : ""}${overnumbered ? "-o" : ""}.avif`,
+    ]);
+  }
+  const csv = rows.map((row) => row.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "cards.csv";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
-searchBar.addEventListener("input", () => {
-  renderCards(allCards);
+function changeQty(id, delta) {
+  setQty(id, qty(id) + delta);
+  renderCards();
+  if (els.modal.open) {
+    const count = els.modalBody.querySelector(".modal-qty span");
+    if (count) count.textContent = String(qty(id));
+  }
+}
+
+async function boot() {
+  const catalog = await fetch("data/cards.json").then((res) => {
+    if (!res.ok) throw new Error("Could not load card catalog");
+    return res.json();
+  });
+  state.cards = catalog.cards || [];
+  state.sets = catalog.sets || [];
+  renderFilters();
+
+  try {
+    const csvText = await fetch("riftbound/cards.csv").then((res) => (res.ok ? res.text() : ""));
+    if (csvText) applyCsvRows(parseCsv(csvText), { onlyIfEmpty: true });
+  } catch {
+    // CSV is optional; collection can live entirely in the browser.
+  }
+
+  els.status.hidden = true;
+  renderCards();
+}
+
+bindChipGroup("setFilters", "set");
+bindChipGroup("typeFilters", "type");
+bindChipGroup("domainFilters", "domain");
+bindChipGroup("rarityFilters", "rarity");
+
+document.getElementById("viewFilters").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-view]");
+  if (!btn) return;
+  state.filters.view = btn.dataset.view;
+  document.querySelectorAll("#viewFilters .chip").forEach((chip) => {
+    chip.classList.toggle("active", chip === btn);
+  });
+  renderCards();
 });
 
-filterButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    filterButtons.forEach((btn) => btn.classList.remove("active"));
-    button.classList.add("active");
-    activeFilter = button.getAttribute("data-filter");
-    renderCards(allCards);
-  });
+els.search.addEventListener("input", () => {
+  state.filters.query = els.search.value;
+  renderCards();
+});
+
+els.sort.addEventListener("change", () => {
+  state.filters.sort = els.sort.value;
+  renderCards();
+});
+
+els.grid.addEventListener("click", (event) => {
+  const deltaBtn = event.target.closest("[data-delta]");
+  const tile = event.target.closest(".card-tile");
+  if (!tile) return;
+  if (deltaBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    changeQty(tile.dataset.id, Number(deltaBtn.dataset.delta));
+    return;
+  }
+  const card = state.cards.find((item) => item.id === tile.dataset.id);
+  if (card) openModal(card);
+});
+
+els.modal.addEventListener("click", (event) => {
+  const deltaBtn = event.target.closest("[data-delta]");
+  const wrap = event.target.closest("[data-id]");
+  if (!deltaBtn || !wrap) return;
+  changeQty(wrap.dataset.id, Number(deltaBtn.dataset.delta));
+});
+
+els.exportBtn.addEventListener("click", exportCollection);
+
+els.importCsv.addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  const applied = applyCsvRows(parseCsv(text), { replace: true });
+  els.status.hidden = false;
+  els.status.textContent = applied ? `Imported quantities for ${applied} cards.` : "No matching cards found in that CSV.";
+  renderCards();
+  event.target.value = "";
+});
+
+boot().catch((error) => {
+  els.status.textContent = `${error.message}. Start a local server in this folder, then refresh.`;
 });

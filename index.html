@@ -3,56 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <title>Riftbound Card Database</title>
+    <meta name="description" content="Search the official Riftbound card catalog and track the cards you own.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech&display=swap" rel="stylesheet">
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="preconnect" href="https://cmsassets.rgpub.io" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-
-    <title>Riftbound Card Inventory</title>
 </head>
 <body>
-    <div class="">
-        <div class="container hero">
-            <div class="row d-flex align-items-center justify-content-center pt-5">
-                <div class="col-12">
-                    <h1 class="text-center share-tech-regular">Riftbound Card Inventory</h1>
-                </div>
+    <div class="page-glow" aria-hidden="true"></div>
+    <header class="topbar">
+        <div class="brand">
+            <p class="eyebrow">Unofficial player tool</p>
+            <h1>Riftbound Archive</h1>
+            <p class="tagline">Official catalog from the <a href="https://playriftbound.com/en-us/card-gallery" target="_blank" rel="noreferrer">Riftbound card gallery</a>, plus a collection you can check from anywhere.</p>
+        </div>
+        <div class="stats" id="stats">
+            <div class="stat"><span id="statCatalog">0</span><label>Catalog</label></div>
+            <div class="stat"><span id="statOwned">0</span><label>Owned</label></div>
+            <div class="stat"><span id="statCopies">0</span><label>Copies</label></div>
+            <div class="stat"><span id="statShown">0</span><label>Showing</label></div>
+        </div>
+    </header>
+
+    <section class="controls">
+        <label class="search-wrap">
+            <span class="visually-hidden">Search cards</span>
+            <input id="search" class="search" type="search" placeholder="Search name, code, text, or tag" autocomplete="off">
+        </label>
+
+        <div class="filter-row">
+            <div class="chip-group" id="setFilters"></div>
+            <div class="chip-group" id="typeFilters"></div>
+        </div>
+        <div class="filter-row">
+            <div class="chip-group" id="domainFilters"></div>
+            <div class="chip-group" id="rarityFilters"></div>
+        </div>
+
+        <div class="toolbar">
+            <div class="chip-group" id="viewFilters">
+                <button class="chip active" data-view="all" type="button">All cards</button>
+                <button class="chip" data-view="owned" type="button">Owned</button>
+                <button class="chip" data-view="missing" type="button">Missing</button>
+            </div>
+            <label class="sort-wrap">
+                Sort
+                <select id="sort">
+                    <option value="number">Collector #</option>
+                    <option value="name">Name</option>
+                    <option value="set">Set</option>
+                    <option value="energy">Energy</option>
+                    <option value="might">Might</option>
+                    <option value="rarity">Rarity</option>
+                </select>
+            </label>
+            <div class="toolbar-actions">
+                <button id="exportCollection" type="button">Export collection</button>
+                <label class="file-btn">
+                    Import CSV
+                    <input id="importCsv" type="file" accept=".csv,text/csv">
+                </label>
             </div>
         </div>
+    </section>
 
-        <div class="container">
-            <div class="row d-flex align-items-center justify-content-center pt-3">
-                <div class="btn-group flex-wrap filter-buttons" role="group">
-                    <button type="button" class="btn btn-outline-primary filter-button active" data-filter="All">All</button>
-                    <button type="button" class="btn btn-outline-primary filter-button" data-filter="Legend">Legend</button>
-                    <button type="button" class="btn btn-outline-primary filter-button" data-filter="Unit">Unit</button>
-                    <button type="button" class="btn btn-outline-primary filter-button" data-filter="Rune">Rune</button>
-                    <button type="button" class="btn btn-outline-primary filter-button" data-filter="Spell">Spell</button>
-                    <button type="button" class="btn btn-outline-primary filter-button" data-filter="Gear">Gear</button>
-                    <button type="button" class="btn btn-outline-primary filter-button" data-filter="Battlefield">Battlefield</button>
-                    <button type="button" class="btn btn-outline-primary filter-button" data-filter="Token">Token</button>
-                </div>
-            </div>
-        </div>
+    <main>
+        <p id="status" class="status">Loading official card gallery…</p>
+        <div id="cardGrid" class="card-grid"></div>
+        <p id="empty" class="empty" hidden>No cards match those filters.</p>
+    </main>
 
-        <div class="container text-center mt-3">
-            <h6 id="totalCardCount" class="share-tech-regular-v2">Total Cards: 0</h6>
-        </div>
+    <dialog id="cardModal" class="modal">
+        <form method="dialog" class="modal-close-row">
+            <button value="close" aria-label="Close">Close</button>
+        </form>
+        <div class="modal-body" id="modalBody"></div>
+    </dialog>
 
-        <div class="container text-center">
-            <input class="form-control w-75 mx-auto searchBar" type="search" placeholder="Search by card name or set number">
-        </div>
+    <footer>
+        <p>Riftbound, League of Legends, and all related marks are trademarks of Riot Games, Inc. This site is unofficial and not endorsed by Riot. Card data and images come from the official gallery at <a href="https://playriftbound.com/en-us/card-gallery" target="_blank" rel="noreferrer">playriftbound.com</a>.</p>
+    </footer>
 
-        <div id="cardList" class="container pt-5">
-            <div id="cardRow" class="row justify-content-center g-4"></div>
-        </div>
-        <p id="noResults" class="text-center mt-4" style="display: none;">No results found.</p>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
     <script src="script.js"></script>
 </body>
 </html>
