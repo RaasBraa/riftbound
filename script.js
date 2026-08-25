@@ -1,4 +1,6 @@
 const STORAGE_KEY = "riftbound-collection-v1";
+const AUTH_KEY = "riftbound-auth-v1";
+const SITE = window.RIFT_SITE || {};
 const RARITY_RANK = { common: 1, uncommon: 2, rare: 3, epic: 4, showcase: 5 };
 const TYPES = ["Unit", "Spell", "Gear", "Legend", "Rune", "Battlefield"];
 const DOMAINS = ["Fury", "Calm", "Mind", "Body", "Chaos", "Order", "Colorless"];
@@ -18,6 +20,13 @@ const els = {
   shown: document.getElementById("statShown"),
   exportBtn: document.getElementById("exportCollection"),
   importCsv: document.getElementById("importCsv"),
+  loginGate: document.getElementById("loginGate"),
+  loginForm: document.getElementById("loginForm"),
+  loginError: document.getElementById("loginError"),
+  password: document.getElementById("password"),
+  remember: document.getElementById("rememberDevice"),
+  app: document.getElementById("app"),
+  logout: document.getElementById("logout"),
 };
 
 const state = {
@@ -34,6 +43,60 @@ const state = {
     sort: "number",
   },
 };
+
+async function sha256Hex(text) {
+  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function readAuth() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function isAuthed() {
+  const saved = readAuth();
+  return Boolean(saved && saved.hash === SITE.passwordHash && saved.expires > Date.now());
+}
+
+function persistAuth(remember) {
+  const days = remember ? 30 : 0.5;
+  localStorage.setItem(
+    AUTH_KEY,
+    JSON.stringify({
+      hash: SITE.passwordHash,
+      expires: Date.now() + days * 24 * 60 * 60 * 1000,
+    })
+  );
+}
+
+function clearAuth() {
+  localStorage.removeItem(AUTH_KEY);
+}
+
+function openVault() {
+  document.body.classList.remove("is-locked");
+  document.body.classList.add("is-open");
+  els.loginGate.hidden = true;
+  els.app.hidden = false;
+}
+
+function lockVault() {
+  clearAuth();
+  document.body.classList.add("is-locked");
+  document.body.classList.remove("is-open");
+  els.app.hidden = true;
+  els.loginGate.hidden = false;
+  if (els.modal.open) els.modal.close();
+}
+
+async function verifyPassword(password) {
+  const hash = await sha256Hex(`${SITE.salt}${password}`);
+  return hash === SITE.passwordHash;
+}
 
 function loadCollection() {
   try {
@@ -240,7 +303,11 @@ function renderCards() {
   els.empty.hidden = cards.length > 0;
   els.grid.replaceChildren();
   const fragment = document.createDocumentFragment();
-  cards.forEach((card) => fragment.append(cardTile(card)));
+  cards.forEach((card, index) => {
+    const tile = cardTile(card);
+    tile.style.setProperty("--i", String(Math.min(index, 24)));
+    fragment.append(tile);
+  });
   els.grid.append(fragment);
 }
 
@@ -317,6 +384,7 @@ function exportCollection() {
 }
 
 function changeQty(id, delta) {
+  if (!isAuthed()) return;
   setQty(id, qty(id) + delta);
   renderCards();
   if (els.modal.open) {
@@ -391,9 +459,13 @@ els.modal.addEventListener("click", (event) => {
   changeQty(wrap.dataset.id, Number(deltaBtn.dataset.delta));
 });
 
-els.exportBtn.addEventListener("click", exportCollection);
+els.exportBtn.addEventListener("click", () => {
+  if (!isAuthed()) return;
+  exportCollection();
+});
 
 els.importCsv.addEventListener("change", async (event) => {
+  if (!isAuthed()) return;
   const file = event.target.files?.[0];
   if (!file) return;
   const text = await file.text();
@@ -404,6 +476,31 @@ els.importCsv.addEventListener("change", async (event) => {
   event.target.value = "";
 });
 
-boot().catch((error) => {
-  els.status.textContent = `${error.message}. Start a local server in this folder, then refresh.`;
+els.loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const ok = await verifyPassword(els.password.value);
+  if (!ok) {
+    els.loginError.hidden = false;
+    const card = els.loginForm.closest(".login-card");
+    card.classList.remove("shake");
+    void card.offsetWidth;
+    card.classList.add("shake");
+    return;
+  }
+  persistAuth(els.remember.checked);
+  openVault();
+  boot().catch((error) => {
+    els.status.hidden = false;
+    els.status.textContent = `${error.message}. Refresh and try again.`;
+  });
 });
+
+els.logout.addEventListener("click", lockVault);
+
+if (isAuthed()) {
+  openVault();
+  boot().catch((error) => {
+    els.status.hidden = false;
+    els.status.textContent = `${error.message}. Refresh and try again.`;
+  });
+}

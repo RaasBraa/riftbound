@@ -11,6 +11,18 @@ Do not open `index.html` as a file. Serve this folder, then visit the local URL:
 - VS Code / Cursor: install Live Server and click Go Live
 - Or any static server pointed at this project root
 
+## Private vault login
+
+The GitHub Pages site opens on a login screen. The vault key is stored as a hash in `config.js`, not as plain text.
+
+To change the key, put a new hash in `config.js`:
+
+```bash
+python -c "import hashlib; print(hashlib.sha256(('ras-brandt-riftbound-vault'+'YOURPASSWORD').encode()).hexdigest())"
+```
+
+Then replace `passwordHash` and push. This keeps casual visitors out. It is still a static site, so it is not bank-grade security.
+
 ## Track your collection
 
 - Use **+ / −** on a card to change how many copies you own

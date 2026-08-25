@@ -3,89 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Riftbound Card Database</title>
-    <meta name="description" content="Search the official Riftbound card catalog and track the cards you own.">
+    <title>Ras's Vault · Riftbound</title>
+    <meta name="description" content="Rasmus's private Riftbound card archive.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cmsassets.rgpub.io" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="page-glow" aria-hidden="true"></div>
-    <header class="topbar">
-        <div class="brand">
-            <p class="eyebrow">Unofficial player tool</p>
-            <h1>Riftbound Archive</h1>
-            <p class="tagline">Official catalog from the <a href="https://playriftbound.com/en-us/card-gallery" target="_blank" rel="noreferrer">Riftbound card gallery</a>, plus a collection you can check from anywhere.</p>
-        </div>
-        <div class="stats" id="stats">
-            <div class="stat"><span id="statCatalog">0</span><label>Catalog</label></div>
-            <div class="stat"><span id="statOwned">0</span><label>Owned</label></div>
-            <div class="stat"><span id="statCopies">0</span><label>Copies</label></div>
-            <div class="stat"><span id="statShown">0</span><label>Showing</label></div>
-        </div>
-    </header>
+<body class="is-locked">
+    <div class="atmosphere" aria-hidden="true">
+        <span class="orb orb-a"></span>
+        <span class="orb orb-b"></span>
+        <span class="orb orb-c"></span>
+        <span class="grain"></span>
+    </div>
 
-    <section class="controls">
-        <label class="search-wrap">
-            <span class="visually-hidden">Search cards</span>
-            <input id="search" class="search" type="search" placeholder="Search name, code, text, or tag" autocomplete="off">
-        </label>
-
-        <div class="filter-row">
-            <div class="chip-group" id="setFilters"></div>
-            <div class="chip-group" id="typeFilters"></div>
-        </div>
-        <div class="filter-row">
-            <div class="chip-group" id="domainFilters"></div>
-            <div class="chip-group" id="rarityFilters"></div>
-        </div>
-
-        <div class="toolbar">
-            <div class="chip-group" id="viewFilters">
-                <button class="chip active" data-view="all" type="button">All cards</button>
-                <button class="chip" data-view="owned" type="button">Owned</button>
-                <button class="chip" data-view="missing" type="button">Missing</button>
+    <section id="loginGate" class="login-gate" aria-label="Vault login">
+        <div class="login-card">
+            <div class="seal" aria-hidden="true">
+                <span class="seal-ring"></span>
+                <span class="seal-monogram">RB</span>
             </div>
-            <label class="sort-wrap">
-                Sort
-                <select id="sort">
-                    <option value="number">Collector #</option>
-                    <option value="name">Name</option>
-                    <option value="set">Set</option>
-                    <option value="energy">Energy</option>
-                    <option value="might">Might</option>
-                    <option value="rarity">Rarity</option>
-                </select>
-            </label>
-            <div class="toolbar-actions">
-                <button id="exportCollection" type="button">Export collection</button>
-                <label class="file-btn">
-                    Import CSV
-                    <input id="importCsv" type="file" accept=".csv,text/csv">
+            <p class="eyebrow">Private collection</p>
+            <h1>Ras's Vault</h1>
+            <p class="login-copy">Rasmus's Riftbound archive. Enter the vault key to browse and update the collection.</p>
+            <form id="loginForm">
+                <label class="visually-hidden" for="password">Vault key</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Vault key" required>
+                <label class="remember">
+                    <input id="rememberDevice" type="checkbox" checked>
+                    Remember this device
                 </label>
-            </div>
+                <button type="submit">Open the vault</button>
+                <p id="loginError" class="login-error" hidden>That key doesn't open this vault.</p>
+            </form>
         </div>
     </section>
 
-    <main>
-        <p id="status" class="status">Loading official card gallery…</p>
-        <div id="cardGrid" class="card-grid"></div>
-        <p id="empty" class="empty" hidden>No cards match those filters.</p>
-    </main>
+    <div id="app" class="app" hidden>
+        <header class="topbar">
+            <div class="brand">
+                <p class="eyebrow">Ras's Vault</p>
+                <h1>Riftbound Archive</h1>
+                <p class="tagline">Personal catalog for Rasmus, sourced from the <a href="https://playriftbound.com/en-us/card-gallery" target="_blank" rel="noreferrer">official gallery</a>.</p>
+            </div>
+            <div class="header-side">
+                <div class="stats" id="stats">
+                    <div class="stat"><span id="statCatalog">0</span><label>Catalog</label></div>
+                    <div class="stat"><span id="statOwned">0</span><label>Owned</label></div>
+                    <div class="stat"><span id="statCopies">0</span><label>Copies</label></div>
+                    <div class="stat"><span id="statShown">0</span><label>Showing</label></div>
+                </div>
+                <button id="logout" class="ghost-btn" type="button">Lock vault</button>
+            </div>
+        </header>
 
-    <dialog id="cardModal" class="modal">
-        <form method="dialog" class="modal-close-row">
-            <button value="close" aria-label="Close">Close</button>
-        </form>
-        <div class="modal-body" id="modalBody"></div>
-    </dialog>
+        <section class="controls">
+            <label class="search-wrap">
+                <span class="visually-hidden">Search cards</span>
+                <input id="search" class="search" type="search" placeholder="Search name, code, text, or tag" autocomplete="off">
+            </label>
 
-    <footer>
-        <p>Riftbound, League of Legends, and all related marks are trademarks of Riot Games, Inc. This site is unofficial and not endorsed by Riot. Card data and images come from the official gallery at <a href="https://playriftbound.com/en-us/card-gallery" target="_blank" rel="noreferrer">playriftbound.com</a>.</p>
-    </footer>
+            <div class="filter-row">
+                <div class="chip-group" id="setFilters"></div>
+                <div class="chip-group" id="typeFilters"></div>
+            </div>
+            <div class="filter-row">
+                <div class="chip-group" id="domainFilters"></div>
+                <div class="chip-group" id="rarityFilters"></div>
+            </div>
 
+            <div class="toolbar">
+                <div class="chip-group" id="viewFilters">
+                    <button class="chip active" data-view="all" type="button">All cards</button>
+                    <button class="chip" data-view="owned" type="button">Owned</button>
+                    <button class="chip" data-view="missing" type="button">Missing</button>
+                </div>
+                <label class="sort-wrap">
+                    Sort
+                    <select id="sort">
+                        <option value="number">Collector #</option>
+                        <option value="name">Name</option>
+                        <option value="set">Set</option>
+                        <option value="energy">Energy</option>
+                        <option value="might">Might</option>
+                        <option value="rarity">Rarity</option>
+                    </select>
+                </label>
+                <div class="toolbar-actions">
+                    <button id="exportCollection" type="button">Export collection</button>
+                    <label class="file-btn">
+                        Import CSV
+                        <input id="importCsv" type="file" accept=".csv,text/csv">
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <main>
+            <p id="status" class="status">Loading official card gallery…</p>
+            <div id="cardGrid" class="card-grid"></div>
+            <p id="empty" class="empty" hidden>No cards match those filters.</p>
+        </main>
+
+        <dialog id="cardModal" class="modal">
+            <form method="dialog" class="modal-close-row">
+                <button value="close" aria-label="Close">Close</button>
+            </form>
+            <div class="modal-body" id="modalBody"></div>
+        </dialog>
+
+        <footer>
+            <p>Riftbound, League of Legends, and all related marks are trademarks of Riot Games, Inc. This site is unofficial and not endorsed by Riot. Card data and images come from the official gallery at <a href="https://playriftbound.com/en-us/card-gallery" target="_blank" rel="noreferrer">playriftbound.com</a>.</p>
+        </footer>
+    </div>
+
+    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
