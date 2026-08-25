@@ -32,7 +32,7 @@ const state = {
     type: "all",
     domain: "all",
     rarity: "all",
-    view: "all",
+    view: "owned",
     query: "",
     sort: "number",
   },
@@ -136,36 +136,26 @@ function applyCsvRows(rows, { replace = false } = {}) {
   return applied;
 }
 
-function chipButton(label, active, attrs = {}) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = `chip${active ? " active" : ""}`;
-  btn.textContent = label;
-  Object.entries(attrs).forEach(([key, value]) => btn.setAttribute(key, value));
-  return btn;
-}
-
-function renderFilterGroup(containerId, values, current, attrName, allLabel = "All") {
-  const group = document.getElementById(containerId);
-  group.replaceChildren();
-  group.append(chipButton(allLabel, current === "all", { [`data-${attrName}`]: "all" }));
+function fillSelect(select, values, current, allLabel) {
+  select.replaceChildren();
+  const all = document.createElement("option");
+  all.value = "all";
+  all.textContent = allLabel;
+  select.append(all);
   values.forEach((value) => {
-    const id = typeof value === "string" ? value : value.id;
-    const label = typeof value === "string" ? value : value.name;
-    group.append(
-      chipButton(label, current === id, {
-        [`data-${attrName}`]: id,
-        ...(attrName === "domain" ? { "data-domain": id } : {}),
-      })
-    );
+    const option = document.createElement("option");
+    option.value = typeof value === "string" ? value : value.id;
+    option.textContent = typeof value === "string" ? value : value.name;
+    select.append(option);
   });
+  select.value = current;
 }
 
 function renderFilters() {
-  renderFilterGroup("setFilters", state.sets, state.filters.set, "set", "All sets");
-  renderFilterGroup("typeFilters", TYPES, state.filters.type, "type", "All types");
-  renderFilterGroup("domainFilters", DOMAINS, state.filters.domain, "domain", "All domains");
-  renderFilterGroup("rarityFilters", RARITIES, state.filters.rarity, "rarity", "All rarities");
+  fillSelect(document.getElementById("setFilters"), state.sets, state.filters.set, "All sets");
+  fillSelect(document.getElementById("typeFilters"), TYPES, state.filters.type, "All types");
+  fillSelect(document.getElementById("domainFilters"), DOMAINS, state.filters.domain, "All domains");
+  fillSelect(document.getElementById("rarityFilters"), RARITIES, state.filters.rarity, "All rarities");
 }
 
 function filteredCards() {
@@ -294,12 +284,9 @@ function openModal(card) {
   els.modal.showModal();
 }
 
-function bindChipGroup(id, key) {
-  document.getElementById(id).addEventListener("click", (event) => {
-    const btn = event.target.closest(`[data-${key}]`);
-    if (!btn) return;
-    state.filters[key] = btn.getAttribute(`data-${key}`);
-    renderFilters();
+function bindSelect(id, key) {
+  document.getElementById(id).addEventListener("change", (event) => {
+    state.filters[key] = event.target.value;
     renderCards();
   });
 }
@@ -346,10 +333,10 @@ async function boot() {
   renderCards();
 }
 
-bindChipGroup("setFilters", "set");
-bindChipGroup("typeFilters", "type");
-bindChipGroup("domainFilters", "domain");
-bindChipGroup("rarityFilters", "rarity");
+bindSelect("setFilters", "set");
+bindSelect("typeFilters", "type");
+bindSelect("domainFilters", "domain");
+bindSelect("rarityFilters", "rarity");
 
 document.getElementById("viewFilters").addEventListener("click", (event) => {
   const btn = event.target.closest("[data-view]");

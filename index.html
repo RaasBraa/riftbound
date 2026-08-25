@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cmsassets.rgpub.io" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="is-open">
     <div class="atmosphere" aria-hidden="true">
@@ -43,23 +43,34 @@
                 <input id="search" class="search" type="search" placeholder="Search name, code, text, or tag" autocomplete="off">
             </label>
 
-            <div class="filter-row">
-                <div class="chip-group" id="setFilters"></div>
-                <div class="chip-group" id="typeFilters"></div>
-            </div>
-            <div class="filter-row">
-                <div class="chip-group" id="domainFilters"></div>
-                <div class="chip-group" id="rarityFilters"></div>
-            </div>
+            <div class="filter-board">
+                <fieldset class="filter-block filter-block-wide">
+                    <legend>Collection</legend>
+                    <div class="segmented" id="viewFilters">
+                        <button class="chip active" data-view="owned" type="button">Owned</button>
+                        <button class="chip" data-view="all" type="button">All cards</button>
+                        <button class="chip" data-view="missing" type="button">Missing</button>
+                    </div>
+                </fieldset>
 
-            <div class="toolbar">
-                <div class="chip-group" id="viewFilters">
-                    <button class="chip active" data-view="all" type="button">All cards</button>
-                    <button class="chip" data-view="owned" type="button">Owned</button>
-                    <button class="chip" data-view="missing" type="button">Missing</button>
-                </div>
-                <label class="sort-wrap">
-                    Sort
+                <label class="filter-block">
+                    <span>Set</span>
+                    <select id="setFilters"></select>
+                </label>
+                <label class="filter-block">
+                    <span>Type</span>
+                    <select id="typeFilters"></select>
+                </label>
+                <label class="filter-block">
+                    <span>Domain</span>
+                    <select id="domainFilters"></select>
+                </label>
+                <label class="filter-block">
+                    <span>Rarity</span>
+                    <select id="rarityFilters"></select>
+                </label>
+                <label class="filter-block">
+                    <span>Sort</span>
                     <select id="sort">
                         <option value="number">Collector #</option>
                         <option value="name">Name</option>
@@ -69,13 +80,14 @@
                         <option value="rarity">Rarity</option>
                     </select>
                 </label>
-                <div class="toolbar-actions editor-only">
-                    <label class="file-btn">
-                        Import CSV
-                        <input id="importCsv" type="file" accept=".csv,text/csv">
-                    </label>
-                    <span id="saveStatus" class="save-status" hidden>Saved</span>
-                </div>
+            </div>
+
+            <div class="toolbar-actions editor-only">
+                <label class="file-btn">
+                    Import CSV
+                    <input id="importCsv" type="file" accept=".csv,text/csv">
+                </label>
+                <span id="saveStatus" class="save-status" hidden>Saved</span>
             </div>
         </section>
 
@@ -97,7 +109,7 @@
         </footer>
     </div>
 
-    <script src="config.js?v=4"></script>
-    <script src="script.js?v=4"></script>
+    <script src="config.js?v=5"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>
