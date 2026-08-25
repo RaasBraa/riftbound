@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ras's Vault · Riftbound</title>
-    <meta name="description" content="Rasmus's private Riftbound card archive.">
+    <meta name="description" content="Rasmus's Riftbound card archive.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cmsassets.rgpub.io" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body class="is-open">
     <div class="atmosphere" aria-hidden="true">
@@ -19,35 +19,13 @@
         <span class="grain"></span>
     </div>
 
-    <dialog id="loginGate" class="login-gate" aria-label="Unlock editing">
-        <div class="login-card">
-            <div class="seal" aria-hidden="true">
-                <span class="seal-ring"></span>
-                <span class="seal-monogram">RB</span>
-            </div>
-            <p class="eyebrow">Editor access</p>
-            <h1>Unlock editing</h1>
-            <p class="login-copy">Anyone can browse Ras's collection. The vault key is only needed to add or remove copies.</p>
-            <form id="loginForm">
-                <label class="visually-hidden" for="password">Vault key</label>
-                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Vault key" required>
-                <label class="remember">
-                    <input id="rememberDevice" type="checkbox" checked>
-                    Remember this device
-                </label>
-                <button type="submit">Unlock editing</button>
-                <button id="loginCancel" type="button" class="ghost-btn">Keep browsing</button>
-                <p id="loginError" class="login-error" hidden>That key doesn't open this vault.</p>
-            </form>
-        </div>
-    </dialog>
-
     <div id="app" class="app">
         <header class="topbar">
             <div class="brand">
-                <p class="eyebrow">Ras's Vault</p>
+                <p class="eyebrow"><span class="mini-seal">RB</span> Ras's Vault</p>
                 <h1>Riftbound Archive</h1>
                 <p class="tagline">Rasmus's Riftbound collection, sourced from the <a href="https://playriftbound.com/en-us/card-gallery" target="_blank" rel="noreferrer">official gallery</a>.</p>
+                <p id="editorBanner" class="editor-banner editor-only" hidden>Local editor is on. +/− writes <code>data/collection.json</code> automatically. Push to publish.</p>
             </div>
             <div class="header-side">
                 <div class="stats" id="stats">
@@ -56,7 +34,6 @@
                     <div class="stat"><span id="statCopies">0</span><label>Copies</label></div>
                     <div class="stat"><span id="statShown">0</span><label>Showing</label></div>
                 </div>
-                <button id="vaultToggle" class="ghost-btn" type="button">Unlock editing</button>
             </div>
         </header>
 
@@ -93,11 +70,11 @@
                     </select>
                 </label>
                 <div class="toolbar-actions editor-only">
-                    <button id="exportCollection" type="button">Export collection</button>
                     <label class="file-btn">
                         Import CSV
                         <input id="importCsv" type="file" accept=".csv,text/csv">
                     </label>
+                    <span id="saveStatus" class="save-status" hidden>Saved</span>
                 </div>
             </div>
         </section>
@@ -120,7 +97,7 @@
         </footer>
     </div>
 
-    <script src="config.js?v=3"></script>
-    <script src="script.js?v=3"></script>
+    <script src="config.js?v=4"></script>
+    <script src="script.js?v=4"></script>
 </body>
 </html>

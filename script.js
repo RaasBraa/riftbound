@@ -1,5 +1,4 @@
-const STORAGE_KEY = "riftbound-collection-v1";
-const AUTH_KEY = "riftbound-auth-v1";
+const CAN_EDIT = location.hostname === "localhost" || location.hostname === "127.0.0.1";
 const SITE = window.RIFT_SITE || {};
 const RARITY_RANK = { common: 1, uncommon: 2, rare: 3, epic: 4, showcase: 5 };
 const TYPES = ["Unit", "Spell", "Gear", "Legend", "Rune", "Battlefield"];
@@ -18,24 +17,16 @@ const els = {
   owned: document.getElementById("statOwned"),
   copies: document.getElementById("statCopies"),
   shown: document.getElementById("statShown"),
-  exportBtn: document.getElementById("exportCollection"),
   importCsv: document.getElementById("importCsv"),
-  loginGate: document.getElementById("loginGate"),
-  loginForm: document.getElementById("loginForm"),
-  loginError: document.getElementById("loginError"),
-  password: document.getElementById("password"),
-  remember: document.getElementById("rememberDevice"),
-  app: document.getElementById("app"),
-  vaultToggle: document.getElementById("vaultToggle"),
-  loginCancel: document.getElementById("loginCancel"),
+  editorBanner: document.getElementById("editorBanner"),
+  saveStatus: document.getElementById("saveStatus"),
 };
 
 const state = {
   cards: [],
   sets: [],
-  publicCollection: {},
   collection: {},
-  booted: false,
+  saveTimer: null,
   filters: {
     set: "all",
     type: "all",
@@ -47,85 +38,6 @@ const state = {
   },
 };
 
-async function sha256Hex(text) {
-  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function readAuth() {
-  try {
-    return JSON.parse(localStorage.getItem(AUTH_KEY) || "null");
-  } catch {
-    return null;
-  }
-}
-
-function isAuthed() {
-  const saved = readAuth();
-  return Boolean(saved && saved.hash === SITE.passwordHash && saved.expires > Date.now());
-}
-
-function persistAuth(remember) {
-  const days = remember ? 30 : 0.5;
-  localStorage.setItem(
-    AUTH_KEY,
-    JSON.stringify({
-      hash: SITE.passwordHash,
-      expires: Date.now() + days * 24 * 60 * 60 * 1000,
-    })
-  );
-}
-
-function clearAuth() {
-  localStorage.removeItem(AUTH_KEY);
-}
-
-function openLogin() {
-  els.loginError.hidden = true;
-  els.password.value = "";
-  els.loginGate.showModal();
-  els.password.focus();
-}
-
-function applyEditMode() {
-  const editing = isAuthed();
-  document.body.classList.toggle("can-edit", editing);
-  els.vaultToggle.textContent = editing ? "Lock editing" : "Unlock editing";
-
-  if (editing) {
-    const local = loadCollection();
-    state.collection = Object.keys(local).length ? local : { ...state.publicCollection };
-    if (!Object.keys(local).length) saveCollection();
-  } else {
-    state.collection = { ...state.publicCollection };
-  }
-
-  if (state.booted) renderCards();
-  if (els.modal.open) els.modal.close();
-}
-
-function lockEditing() {
-  clearAuth();
-  applyEditMode();
-}
-
-async function verifyPassword(password) {
-  const hash = await sha256Hex(`${SITE.salt}${password}`);
-  return hash === SITE.passwordHash;
-}
-
-function loadCollection() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function saveCollection() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.collection));
-}
-
 function qty(id) {
   return Number(state.collection[id] || 0);
 }
@@ -134,7 +46,38 @@ function setQty(id, next) {
   const value = Math.max(0, Number(next) || 0);
   if (value === 0) delete state.collection[id];
   else state.collection[id] = value;
-  saveCollection();
+  queueSave();
+}
+
+function queueSave() {
+  if (!CAN_EDIT) return;
+  clearTimeout(state.saveTimer);
+  state.saveTimer = setTimeout(saveCollectionFile, 200);
+}
+
+async function saveCollectionFile() {
+  if (!CAN_EDIT) return;
+  const payload = {};
+  for (const [id, amount] of Object.entries(state.collection)) {
+    if (Number(amount) > 0) payload[id] = Number(amount);
+  }
+  const res = await fetch("/api/collection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    els.status.hidden = false;
+    els.status.textContent = "Could not write collection.json. Start python scripts/local_server.py";
+    return;
+  }
+  if (els.saveStatus) {
+    els.saveStatus.hidden = false;
+    els.saveStatus.textContent = "Saved collection.json";
+    setTimeout(() => {
+      els.saveStatus.hidden = true;
+    }, 1200);
+  }
 }
 
 function imageUrl(url, width) {
@@ -143,19 +86,10 @@ function imageUrl(url, width) {
   return `${base}?accountingTag=RB&w=${width}&fit=max&auto=format`;
 }
 
-function slugify(text) {
-  return String(text || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 function parseCsv(text) {
   const lines = text.replace(/^\uFEFF/, "").trim().split(/\r?\n/);
   if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const headers = lines[0].split(",").map((header) => header.trim());
   return lines.slice(1).map((line) => {
     const values = line.split(",");
     const row = {};
@@ -189,18 +123,16 @@ function matchCsvRow(row) {
   return scored[0].card;
 }
 
-function applyCsvRows(rows, { onlyIfEmpty = false, replace = false, target = state.collection } = {}) {
-  if (onlyIfEmpty && Object.keys(target).length) return 0;
+function applyCsvRows(rows, { replace = false } = {}) {
   let applied = 0;
   for (const row of rows) {
     const card = matchCsvRow(row);
     const amount = Number(row.quantity || 0);
     if (!card || amount < 0) continue;
-    target[card.id] = replace ? amount : (target[card.id] || 0) + amount;
-    if (target[card.id] === 0) delete target[card.id];
+    state.collection[card.id] = replace ? amount : (state.collection[card.id] || 0) + amount;
+    if (state.collection[card.id] === 0) delete state.collection[card.id];
     applied += 1;
   }
-  if (applied && target === state.collection) saveCollection();
   return applied;
 }
 
@@ -238,7 +170,6 @@ function renderFilters() {
 
 function filteredCards() {
   const q = state.filters.query.trim().toLowerCase();
-  const rarityOrder = RARITY_RANK;
 
   const list = state.cards.filter((card) => {
     if (state.filters.set !== "all" && card.set !== state.filters.set) return false;
@@ -275,7 +206,7 @@ function filteredCards() {
     if (sort === "energy") return (a.energy ?? 99) - (b.energy ?? 99) || a.name.localeCompare(b.name);
     if (sort === "might") return (b.might ?? -1) - (a.might ?? -1) || a.name.localeCompare(b.name);
     if (sort === "rarity") {
-      return (rarityOrder[b.rarityId] || 0) - (rarityOrder[a.rarityId] || 0) || a.number - b.number;
+      return (RARITY_RANK[b.rarityId] || 0) - (RARITY_RANK[a.rarityId] || 0) || a.number - b.number;
     }
     return a.set.localeCompare(b.set) || a.number - b.number || a.name.localeCompare(b.name);
   });
@@ -293,18 +224,17 @@ function updateStats(shownCount) {
 
 function cardTile(card) {
   const ownedCount = qty(card.id);
-  const button = document.createElement("article");
-  button.className = `card-tile${ownedCount ? " owned" : ""}`;
-  button.dataset.id = card.id;
-  const canEdit = isAuthed();
-  const showQty = canEdit || ownedCount > 0;
-  button.innerHTML = `
+  const tile = document.createElement("article");
+  tile.className = `card-tile${ownedCount ? " owned" : ""}`;
+  tile.dataset.id = card.id;
+  const showQty = CAN_EDIT || ownedCount > 0;
+  tile.innerHTML = `
     <div class="art-wrap ${card.orientation === "landscape" ? "landscape" : ""}">
       <img src="${imageUrl(card.image, 360)}" alt="${card.name}" loading="lazy" width="360" height="500">
-      ${showQty ? `<div class="qty${canEdit ? "" : " is-readonly"}">
-        ${canEdit ? `<button type="button" data-delta="-1" aria-label="Remove one ${card.name}">−</button>` : ""}
+      ${showQty ? `<div class="qty${CAN_EDIT ? "" : " is-readonly"}">
+        ${CAN_EDIT ? `<button type="button" data-delta="-1" aria-label="Remove one ${card.name}">−</button>` : ""}
         <span>${ownedCount}</span>
-        ${canEdit ? `<button type="button" data-delta="1" aria-label="Add one ${card.name}">+</button>` : ""}
+        ${CAN_EDIT ? `<button type="button" data-delta="1" aria-label="Add one ${card.name}">+</button>` : ""}
       </div>` : ""}
     </div>
     <div class="card-meta">
@@ -312,7 +242,7 @@ function cardTile(card) {
       <small>${card.code} · ${card.types.join(", ")}</small>
     </div>
   `;
-  return button;
+  return tile;
 }
 
 function renderCards() {
@@ -352,13 +282,13 @@ function openModal(card) {
       <div class="facts">${card.domains.map((domain) => `<span class="domain-pip">${domain}</span>`).join("")}</div>
       <p class="rules">${card.text || card.effect || "No rules text."}</p>
       ${card.illustrator?.length ? `<p class="rules">Art: ${card.illustrator.join(", ")}</p>` : ""}
-      ${isAuthed() ? `
+      ${CAN_EDIT ? `
       <div class="modal-qty qty" data-id="${card.id}">
         <button type="button" data-delta="-1">−</button>
         <span>${ownedCount}</span>
         <button type="button" data-delta="1">+</button>
         <small>copies owned</small>
-      </div>` : `<p class="rules">${ownedCount} ${ownedCount === 1 ? "copy" : "copies"} in Ras's collection</p>`}
+      </div>` : `<p class="rules">${ownedCount} ${ownedCount === 1 ? "copy" : "copies"} in ${SITE.possessive || "this"} collection</p>`}
     </div>
   `;
   els.modal.showModal();
@@ -374,45 +304,8 @@ function bindChipGroup(id, key) {
   });
 }
 
-function exportCollection() {
-  const rows = [["name", "set", "quantity", "type", "color", "altArt", "overnumbered", "image"]];
-  for (const card of state.cards) {
-    const amount = qty(card.id);
-    if (!amount) continue;
-    const alt = /a\b/i.test(card.code) || (card.id.match(/-\d+[a-z]/) != null);
-    const overnumbered = (card.code || "").includes("*");
-    rows.push([
-      card.name,
-      card.set,
-      amount,
-      (card.types[0] || "").toUpperCase(),
-      card.domains.map((d) => d.toUpperCase()).join("&"),
-      String(alt),
-      String(overnumbered),
-      `${slugify(card.name)}-${slugify(card.set)}${alt ? "-a" : ""}${overnumbered ? "-o" : ""}.avif`,
-    ]);
-  }
-  const json = JSON.stringify(state.collection, null, 2);
-  const jsonBlob = new Blob([json], { type: "application/json" });
-  const jsonUrl = URL.createObjectURL(jsonBlob);
-  const jsonLink = document.createElement("a");
-  jsonLink.href = jsonUrl;
-  jsonLink.download = "collection.json";
-  jsonLink.click();
-  URL.revokeObjectURL(jsonUrl);
-
-  const csv = rows.map((row) => row.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "cards.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function changeQty(id, delta) {
-  if (!isAuthed()) return;
+  if (!CAN_EDIT) return;
   setQty(id, qty(id) + delta);
   renderCards();
   if (els.modal.open) {
@@ -422,6 +315,9 @@ function changeQty(id, delta) {
 }
 
 async function boot() {
+  document.body.classList.toggle("can-edit", CAN_EDIT);
+  if (els.editorBanner) els.editorBanner.hidden = !CAN_EDIT;
+
   const catalog = await fetch("data/cards.json").then((res) => {
     if (!res.ok) throw new Error("Could not load card catalog");
     return res.json();
@@ -432,22 +328,20 @@ async function boot() {
 
   try {
     const csvText = await fetch("riftbound/cards.csv").then((res) => (res.ok ? res.text() : ""));
-    if (csvText) applyCsvRows(parseCsv(csvText), { target: state.publicCollection });
+    if (csvText) applyCsvRows(parseCsv(csvText));
   } catch {
-    // Public CSV is optional if collection.json is present.
+    // CSV is only a starter seed.
   }
 
   try {
     const published = await fetch("data/collection.json").then((res) => (res.ok ? res.json() : null));
     if (published && typeof published === "object" && Object.keys(published).length) {
-      state.publicCollection = { ...state.publicCollection, ...published };
+      state.collection = published;
     }
   } catch {
-    // collection.json is optional until the first export is published.
+    // collection.json can start empty.
   }
 
-  applyEditMode();
-  state.booted = true;
   els.status.hidden = true;
   renderCards();
 }
@@ -498,45 +392,19 @@ els.modal.addEventListener("click", (event) => {
   changeQty(wrap.dataset.id, Number(deltaBtn.dataset.delta));
 });
 
-els.exportBtn.addEventListener("click", () => {
-  if (!isAuthed()) return;
-  exportCollection();
-});
-
-els.importCsv.addEventListener("change", async (event) => {
-  if (!isAuthed()) return;
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const text = await file.text();
-  const applied = applyCsvRows(parseCsv(text), { replace: true });
-  els.status.hidden = false;
-  els.status.textContent = applied ? `Imported quantities for ${applied} cards.` : "No matching cards found in that CSV.";
-  renderCards();
-  event.target.value = "";
-});
-
-els.loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const ok = await verifyPassword(els.password.value);
-  if (!ok) {
-    els.loginError.hidden = false;
-    const card = els.loginForm.closest(".login-card");
-    card.classList.remove("shake");
-    void card.offsetWidth;
-    card.classList.add("shake");
-    return;
-  }
-  persistAuth(els.remember.checked);
-  els.loginGate.close();
-  applyEditMode();
-});
-
-els.loginCancel.addEventListener("click", () => els.loginGate.close());
-
-els.vaultToggle.addEventListener("click", () => {
-  if (isAuthed()) lockEditing();
-  else openLogin();
-});
+if (els.importCsv) {
+  els.importCsv.addEventListener("change", async (event) => {
+    if (!CAN_EDIT) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const applied = applyCsvRows(parseCsv(await file.text()), { replace: true });
+    queueSave();
+    els.status.hidden = false;
+    els.status.textContent = applied ? `Imported quantities for ${applied} cards.` : "No matching cards found in that CSV.";
+    renderCards();
+    event.target.value = "";
+  });
+}
 
 boot().catch((error) => {
   els.status.hidden = false;
