@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Card intake · Ras's Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="intake.css?v=4">
+</head>
+<body class="is-open can-edit">
+    <div class="atmosphere" aria-hidden="true">
+        <span class="orb orb-a"></span>
+        <span class="orb orb-c"></span>
+        <span class="grain"></span>
+    </div>
+
+    <main class="intake">
+        <p class="eyebrow"><span class="mini-seal">RB</span> Bulk intake</p>
+        <h1>Add cards fast</h1>
+        <p class="tagline">Say the card name, type it, or use the webcam. Counts save to <code>collection.json</code>.</p>
+        <p><a href="index.html">← Back to archive</a></p>
+        <p id="offline" class="status" hidden>Start the local editor first: <code>python scripts/local_server.py</code></p>
+
+        <section class="intake-panel voice-panel">
+            <h2>Voice</h2>
+            <p class="tagline">Click listen, then say the card name. Say <strong>undo</strong> if it grabs the wrong one. Chrome or Edge works best.</p>
+            <div id="heardCard" class="heard-card is-empty">
+                <div class="heard-art" id="heardArt">
+                    <img id="heardImg" alt="">
+                </div>
+                <div class="heard-meta">
+                    <p id="heardHeard" class="heard-live">Heard: —</p>
+                    <strong id="heardName">Waiting for a card</strong>
+                    <small id="heardCode">The art pops here so you can check it</small>
+                    <p id="heardQty" class="heard-qty"></p>
+                    <button id="plusOne" type="button" disabled>+1</button>
+                </div>
+            </div>
+            <div class="camera-actions">
+                <button id="startVoice" type="button">Start listening</button>
+                <button id="stopVoice" type="button" hidden>Stop listening</button>
+            </div>
+            <p id="voiceStatus" class="status">The +1 stamp plays on every add, even the same card twice.</p>
+            <div id="voicePicks" class="voice-picks"></div>
+        </section>
+
+        <section class="intake-panel">
+            <label class="search-wrap">
+                <span class="visually-hidden">Add by name</span>
+                <input id="addSearch" class="search" type="search" placeholder="Type card name or OGN-045, then Enter" autocomplete="off" autofocus>
+            </label>
+            <div id="suggestions" class="suggestions"></div>
+            <p id="lastAdded" class="last-added">Ready. Sorted piles go fastest: type, Enter, next card.</p>
+        </section>
+
+        <section class="intake-panel camera-panel">
+            <h2>Webcam</h2>
+            <p class="tagline">Start the webcam, hold one card in the dashed box (name at the top). It adds when it can read it, then waits until you pull that card away.</p>
+            <label class="camera-pick" id="cameraPick" hidden>
+                <span>Camera</span>
+                <select id="cameraSelect"></select>
+            </label>
+            <div class="camera-stage" id="cameraStage" hidden>
+                <video id="camera" playsinline autoplay muted></video>
+                <div class="camera-guide" aria-hidden="true"></div>
+            </div>
+            <canvas id="frame" hidden></canvas>
+            <div class="camera-actions">
+                <button id="startCamera" type="button">Start webcam</button>
+                <button id="stopCamera" type="button" hidden>Stop</button>
+                <button id="scanCard" type="button" disabled>Scan now</button>
+                <label class="file-btn">
+                    Take photo
+                    <input id="capturePhoto" type="file" accept="image/*" capture="environment">
+                </label>
+            </div>
+            <p id="scanStatus" class="status">Space also scans while the webcam is on.</p>
+            <div id="scanMatches" class="suggestions"></div>
+        </section>
+
+        <section class="intake-panel">
+            <h2>This session</h2>
+            <p id="sessionStats" class="tagline">0 adds · 0 unique</p>
+            <ol id="sessionLog" class="session-log"></ol>
+            <button id="undo" type="button" disabled>Undo last add</button>
+        </section>
+    </main>
+
+    <script src="intake.js?v=4"></script>
+</body>
+</html>

@@ -1,20 +1,27 @@
 # Riftbound Archive
 
-A static online card database for [Riftbound](https://playriftbound.com/en-us/card-gallery). The GitHub Pages site is view-only, so you can check Ras's collection from a phone. Counts live in `data/collection.json`.
+A static online card database for [Riftbound](https://playriftbound.com/en-us/card-gallery). The GitHub Pages site is view-only. Counts live in `data/collection.json`.
 
-## Update the collection locally
+## Best way to add a lot of cards
 
-Start the local editor (don't open `index.html` as a file):
+Do **not** tap +/− a thousand times on the gallery. Use the local **card intake** page.
 
 ```bash
 python scripts/local_server.py
 ```
 
-Then open http://127.0.0.1:4173
+- Computer: http://127.0.0.1:4173/intake.html
+- Phone camera on the same Wi‑Fi: the terminal prints a `Phone camera` URL
 
-- **+ / −** writes `data/collection.json` automatically
-- Import CSV if you still have the old template file
-- When the counts look right:
+**Fastest for ~1000 cards:** sort the pile, type the first few letters of the name, press Enter. Repeat. Undo is there if you miss.
+
+**Voice (best with a weak webcam):** on intake, click **Start listening** in Chrome or Edge, then say the card name. The card art pops in with a +1 stamp on every add, including the same card twice. Say **undo** if it grabs the wrong one. If several printings share a name, tap the right art.
+
+**Phone:** open the `Phone camera` URL and use **Take photo**. Live video is often blocked on `http://`. Anyone on your Wi‑Fi can write `collection.json` while the local server is running.
+
+**CSV:** if you already scanned in another Riftbound app, export CSV and import it from the archive editor.
+
+Then publish:
 
 ```bash
 git add data/collection.json
@@ -22,11 +29,7 @@ git commit -m "Update collection"
 git push
 ```
 
-GitHub Pages will show the new numbers after it rebuilds.
-
 ## Refresh the official catalog
-
-When a new set hits the [official gallery](https://playriftbound.com/en-us/card-gallery):
 
 ```bash
 python scripts/fetch_cards.py

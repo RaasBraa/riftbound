@@ -1,4 +1,4 @@
-const CAN_EDIT = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+let CAN_EDIT = false;
 const SITE = window.RIFT_SITE || {};
 const RARITY_RANK = { common: 1, uncommon: 2, rare: 3, epic: 4, showcase: 5 };
 const TYPES = ["Unit", "Spell", "Gear", "Legend", "Rune", "Battlefield"];
@@ -37,6 +37,15 @@ const state = {
     sort: "number",
   },
 };
+
+async function detectEditor() {
+  try {
+    const res = await fetch("/api/health", { cache: "no-store" });
+    CAN_EDIT = res.ok;
+  } catch {
+    CAN_EDIT = false;
+  }
+}
 
 function qty(id) {
   return Number(state.collection[id] || 0);
@@ -302,6 +311,7 @@ function changeQty(id, delta) {
 }
 
 async function boot() {
+  await detectEditor();
   document.body.classList.toggle("can-edit", CAN_EDIT);
   if (els.editorBanner) els.editorBanner.hidden = !CAN_EDIT;
 
