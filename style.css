@@ -240,6 +240,10 @@ footer {
     width: 100%;
 }
 
+body.can-edit .stats {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .stat {
     background: var(--bg-raised);
     border: 1px solid var(--line);
@@ -252,6 +256,7 @@ footer {
 .stat:nth-child(2) { animation-delay: 0.05s; }
 .stat:nth-child(3) { animation-delay: 0.1s; }
 .stat:nth-child(4) { animation-delay: 0.15s; }
+.stat:nth-child(5) { animation-delay: 0.2s; }
 
 .stat span {
     display: block;

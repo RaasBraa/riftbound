@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COLLECTION = ROOT / "data" / "collection.json"
+PRICES = ROOT / "data" / "prices.json"
 PORT = 4173
 
 
@@ -40,12 +41,34 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
-        if self.path.split("?", 1)[0] == "/api/health":
+        path = self.path.split("?", 1)[0]
+        if path == "/api/health":
             self._send_json(200, {"ok": True, "edit": True})
+            return
+        if path == "/api/prices":
+            if not PRICES.exists():
+                self._send_json(200, {"cards": {}, "matched": 0})
+                return
+            self._send_json(200, json.loads(PRICES.read_text(encoding="utf-8")))
             return
         super().do_GET()
 
     def do_POST(self) -> None:
+        if self.path == "/api/prices/refresh":
+            import sys
+
+            scripts_dir = str(Path(__file__).resolve().parent)
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from fetch_prices import write_prices
+
+            try:
+                payload = write_prices()
+            except Exception as error:
+                self._send_json(502, {"ok": False, "error": str(error)})
+                return
+            self._send_json(200, {"ok": True, "matched": payload.get("matched", 0), "fetchedAt": payload.get("fetchedAt")})
+            return
         if self.path != "/api/collection":
             self.send_error(404)
             return
@@ -67,7 +90,7 @@ def main() -> None:
     print(f"Local editor:  http://127.0.0.1:{PORT}")
     print(f"Phone camera:  http://{lan_ip()}:{PORT}/intake.html")
     print("Type names or scan cards. collection.json updates automatically.")
-    print("Push that file when you want GitHub Pages to show the new counts.")
+    print("Cardmarket values: click Refresh prices, or python scripts/fetch_prices.py")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

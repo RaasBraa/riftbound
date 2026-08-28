@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cmsassets.rgpub.io" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body class="is-open">
     <div class="atmosphere" aria-hidden="true">
@@ -33,6 +33,10 @@
                     <div class="stat"><span id="statOwned">0</span><label>Owned</label></div>
                     <div class="stat"><span id="statCopies">0</span><label>Copies</label></div>
                     <div class="stat"><span id="statShown">0</span><label>Showing</label></div>
+                    <div class="stat editor-only" id="valueStat">
+                        <span id="statValue">—</span>
+                        <label>EU value</label>
+                    </div>
                 </div>
             </div>
         </header>
@@ -78,6 +82,7 @@
                         <option value="energy">Energy</option>
                         <option value="might">Might</option>
                         <option value="rarity">Rarity</option>
+                        <option value="value">EU value</option>
                     </select>
                 </label>
             </div>
@@ -87,6 +92,7 @@
                     Import CSV
                     <input id="importCsv" type="file" accept=".csv,text/csv">
                 </label>
+                <button id="refreshPrices" class="ghost-btn" type="button">Refresh prices</button>
                 <span id="saveStatus" class="save-status" hidden>Saved</span>
             </div>
         </section>
@@ -109,7 +115,7 @@
         </footer>
     </div>
 
-    <script src="config.js?v=8"></script>
-    <script src="script.js?v=8"></script>
+    <script src="config.js?v=10"></script>
+    <script src="script.js?v=10"></script>
 </body>
 </html>

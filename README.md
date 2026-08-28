@@ -37,6 +37,16 @@ python scripts/fetch_cards.py
 
 This also adds rune reprints the official gallery skips (Spiritforged, Unleashed, Vendetta showcase/promo, and Origins `b` promos). Commit `data/cards.json` and push.
 
+## Collection value (local editor)
+
+Cardmarket.com blocks automated lookups. The local editor instead stores lowest **EU** listings (the Cardmarket-style “from” price) and links each card to Cardmarket search.
+
+```bash
+python scripts/fetch_prices.py
+```
+
+Or click **Refresh prices** while the local server is running. Restart the server once after this change. The **EU value** stat is copies × lowest EU listing. Sort by **EU value** to see the expensive cards first.
+
 ## Disclaimer
 
 Riftbound, League of Legends, and related marks are trademarks of Riot Games, Inc. This project is unofficial and not endorsed by Riot. Card data and images are sourced from the official gallery.

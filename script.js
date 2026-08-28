@@ -17,7 +17,10 @@ const els = {
   owned: document.getElementById("statOwned"),
   copies: document.getElementById("statCopies"),
   shown: document.getElementById("statShown"),
+  value: document.getElementById("statValue"),
+  valueStat: document.getElementById("valueStat"),
   importCsv: document.getElementById("importCsv"),
+  refreshPrices: document.getElementById("refreshPrices"),
   editorBanner: document.getElementById("editorBanner"),
   saveStatus: document.getElementById("saveStatus"),
 };
@@ -26,6 +29,7 @@ const state = {
   cards: [],
   sets: [],
   collection: {},
+  prices: {},
   saveTimer: null,
   filters: {
     set: "all",
@@ -49,6 +53,23 @@ async function detectEditor() {
 
 function qty(id) {
   return Number(state.collection[id] || 0);
+}
+
+function priceCents(id) {
+  const row = state.prices[id];
+  return row && row.eurCents != null ? Number(row.eurCents) : null;
+}
+
+function formatEur(cents) {
+  if (cents == null || Number.isNaN(cents)) return "—";
+  return (cents / 100).toLocaleString("da-DK", { style: "currency", currency: "EUR" });
+}
+
+function cardmarketUrl(card) {
+  const row = state.prices[card.id];
+  if (row?.cardmarket) return row.cardmarket;
+  const query = encodeURIComponent(`${card.name} ${(card.code || "").split("/")[0]}`.trim());
+  return `https://www.cardmarket.com/en/Riftbound/Products/Search?searchString=${query}`;
 }
 
 function setQty(id, next) {
@@ -208,6 +229,14 @@ function filteredCards() {
     if (sort === "set") return a.set.localeCompare(b.set) || byNumber || a.code.localeCompare(b.code);
     if (sort === "energy") return (a.energy ?? 99) - (b.energy ?? 99) || a.name.localeCompare(b.name);
     if (sort === "might") return (b.might ?? -1) - (a.might ?? -1) || a.name.localeCompare(b.name);
+    if (sort === "value") {
+      const aPrice = priceCents(a.id);
+      const bPrice = priceCents(b.id);
+      if (aPrice == null && bPrice == null) return a.name.localeCompare(b.name);
+      if (aPrice == null) return 1;
+      if (bPrice == null) return -1;
+      return bPrice - aPrice || a.name.localeCompare(b.name);
+    }
     if (sort === "rarity") {
       return (RARITY_RANK[b.rarityId] || 0) - (RARITY_RANK[a.rarityId] || 0) || byNumber;
     }
@@ -223,6 +252,21 @@ function updateStats(shownCount) {
   els.owned.textContent = String(ownedIds.length);
   els.copies.textContent = String(copies);
   els.shown.textContent = String(shownCount);
+  if (els.value) {
+    let total = 0;
+    let unpriced = 0;
+    ownedIds.forEach((id) => {
+      const cents = priceCents(id);
+      if (cents == null) unpriced += qty(id);
+      else total += cents * qty(id);
+    });
+    els.value.textContent = formatEur(total);
+    if (els.valueStat) {
+      els.valueStat.title = unpriced
+        ? `${unpriced} owned copies have no EU listing yet`
+        : "Lowest EU listing × copies owned";
+    }
+  }
 }
 
 function cardTile(card) {
@@ -242,7 +286,7 @@ function cardTile(card) {
     </div>
     <div class="card-meta">
       <strong>${card.name}</strong>
-      <small>${card.code} · ${card.rarity || (card.types || []).join(", ")}</small>
+      <small>${card.code} · ${card.rarity || (card.types || []).join(", ")}${CAN_EDIT ? ` · ${formatEur(priceCents(card.id))}` : ""}</small>
     </div>
   `;
   return tile;
@@ -284,6 +328,7 @@ function openModal(card) {
       <div class="facts">${facts.map((fact) => `<span>${fact}</span>`).join("")}</div>
       <div class="facts">${card.domains.map((domain) => `<span class="domain-pip">${domain}</span>`).join("")}</div>
       <p class="rules">${card.text || card.effect || "No rules text."}</p>
+      ${CAN_EDIT ? `<p class="rules">EU lowest ${formatEur(priceCents(card.id))} · <a href="${cardmarketUrl(card)}" target="_blank" rel="noreferrer">Cardmarket</a></p>` : ""}
       ${card.illustrator?.length ? `<p class="rules">Art: ${card.illustrator.join(", ")}</p>` : ""}
       ${CAN_EDIT ? `
       <div class="modal-qty qty" data-id="${card.id}">
@@ -318,6 +363,7 @@ async function boot() {
   await detectEditor();
   document.body.classList.toggle("can-edit", CAN_EDIT);
   if (els.editorBanner) els.editorBanner.hidden = !CAN_EDIT;
+  if (CAN_EDIT) await loadPrices();
 
   const catalog = await fetch("data/cards.json").then((res) => {
     if (!res.ok) throw new Error("Could not load card catalog");
@@ -405,6 +451,37 @@ if (els.importCsv) {
     renderCards();
     event.target.value = "";
   });
+}
+
+if (els.refreshPrices) {
+  els.refreshPrices.addEventListener("click", async () => {
+    els.refreshPrices.disabled = true;
+    els.status.hidden = false;
+    els.status.textContent = "Refreshing EU prices… this can take about 15 seconds.";
+    try {
+      const res = await fetch("/api/prices/refresh", { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || "Price refresh failed");
+      await loadPrices();
+      renderCards();
+      els.status.textContent = `Updated prices for ${payload.matched || 0} cards.`;
+    } catch (error) {
+      els.status.textContent = `${error.message}. Or run python scripts/fetch_prices.py`;
+    } finally {
+      els.refreshPrices.disabled = false;
+    }
+  });
+}
+
+async function loadPrices() {
+  try {
+    let res = await fetch("/api/prices", { cache: "no-store" });
+    if (!res.ok) res = await fetch("data/prices.json", { cache: "no-store" });
+    const payload = res.ok ? await res.json() : {};
+    state.prices = payload.cards && typeof payload.cards === "object" ? payload.cards : {};
+  } catch {
+    state.prices = {};
+  }
 }
 
 boot().catch((error) => {
