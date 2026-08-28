@@ -73,11 +73,13 @@ function qty(id) {
 
 function imageUrl(url, width) {
   if (!url) return "";
-  return `${url.split("?")[0]}?accountingTag=RB&w=${width}&fit=max&auto=format`;
+  const base = url.split("?")[0];
+  if (!base.includes("cmsassets.rgpub.io")) return base;
+  return `${base}?accountingTag=RB&w=${width}&fit=max&auto=format`;
 }
 
 function isAltPrint(card) {
-  return /a\/|\*/.test(card.code || "");
+  return /[ab]\/|[AB]$|[ab]\b|\*/.test(card.code || "");
 }
 
 function playAddBurst() {
@@ -143,7 +145,7 @@ function searchCards(query) {
     })
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.card.name.localeCompare(b.card.name))
-    .slice(0, 8)
+    .slice(0, 16)
     .map((item) => item.card);
 }
 
@@ -508,13 +510,10 @@ function matchFromSpeech(text, pool) {
 function preferPrints(matches) {
   if (!matches.length) return [];
   const best = matches[0].score;
-  const top = matches.filter((item) => item.score >= best - 2);
-  const sameName = top.every((item) => item.card.name === top[0].card.name);
-  if (sameName) {
-    const base = top.find((item) => !isAltPrint(item.card)) || top[0];
-    return [base];
-  }
-  return top.slice(0, 8);
+  return matches
+    .filter((item) => item.score >= best - 2)
+    .sort((a, b) => b.score - a.score || Number(isAltPrint(a.card)) - Number(isAltPrint(b.card)) || a.card.code.localeCompare(b.card.code))
+    .slice(0, 16);
 }
 
 function showVoicePicks(matches) {
@@ -524,7 +523,7 @@ function showVoicePicks(matches) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "voice-pick";
-    btn.innerHTML = `<img src="${imageUrl(card.image, 220)}" alt=""><small>${escapeHtml(card.name)}<br>${escapeHtml(card.code)}</small>`;
+    btn.innerHTML = `<img src="${imageUrl(card.image, 220)}" alt=""><small>${escapeHtml(card.name)}<br>${escapeHtml(card.code)} · ${escapeHtml(card.rarity || "")}</small>`;
     btn.addEventListener("click", () => {
       addCard(card);
       voiceStatus.textContent = `Added ${card.name}. Say the next name.`;

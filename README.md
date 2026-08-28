@@ -35,7 +35,7 @@ git push
 python scripts/fetch_cards.py
 ```
 
-Commit `data/cards.json` and push.
+This also adds rune reprints the official gallery skips (Spiritforged, Unleashed, Vendetta showcase/promo, and Origins `b` promos). Commit `data/cards.json` and push.
 
 ## Disclaimer
 

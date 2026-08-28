@@ -1,9 +1,9 @@
 let CAN_EDIT = false;
 const SITE = window.RIFT_SITE || {};
-const RARITY_RANK = { common: 1, uncommon: 2, rare: 3, epic: 4, showcase: 5 };
+const RARITY_RANK = { common: 1, uncommon: 2, rare: 3, epic: 4, promo: 5, showcase: 6 };
 const TYPES = ["Unit", "Spell", "Gear", "Legend", "Rune", "Battlefield"];
 const DOMAINS = ["Fury", "Calm", "Mind", "Body", "Chaos", "Order", "Colorless"];
-const RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Showcase"];
+const RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Showcase", "Promo"];
 
 const els = {
   search: document.getElementById("search"),
@@ -92,6 +92,7 @@ async function saveCollectionFile() {
 function imageUrl(url, width) {
   if (!url) return "";
   const base = url.split("?")[0];
+  if (!base.includes("cmsassets.rgpub.io")) return base;
   return `${base}?accountingTag=RB&w=${width}&fit=max&auto=format`;
 }
 
@@ -200,14 +201,17 @@ function filteredCards() {
 
   const sort = state.filters.sort;
   list.sort((a, b) => {
-    if (sort === "name") return a.name.localeCompare(b.name);
-    if (sort === "set") return a.set.localeCompare(b.set) || a.number - b.number;
+    const aNum = Number(a.number);
+    const bNum = Number(b.number);
+    const byNumber = (Number.isFinite(aNum) ? aNum : 9999) - (Number.isFinite(bNum) ? bNum : 9999);
+    if (sort === "name") return a.name.localeCompare(b.name) || a.code.localeCompare(b.code);
+    if (sort === "set") return a.set.localeCompare(b.set) || byNumber || a.code.localeCompare(b.code);
     if (sort === "energy") return (a.energy ?? 99) - (b.energy ?? 99) || a.name.localeCompare(b.name);
     if (sort === "might") return (b.might ?? -1) - (a.might ?? -1) || a.name.localeCompare(b.name);
     if (sort === "rarity") {
-      return (RARITY_RANK[b.rarityId] || 0) - (RARITY_RANK[a.rarityId] || 0) || a.number - b.number;
+      return (RARITY_RANK[b.rarityId] || 0) - (RARITY_RANK[a.rarityId] || 0) || byNumber;
     }
-    return a.set.localeCompare(b.set) || a.number - b.number || a.name.localeCompare(b.name);
+    return a.set.localeCompare(b.set) || byNumber || a.code.localeCompare(b.code);
   });
   return list;
 }
@@ -238,7 +242,7 @@ function cardTile(card) {
     </div>
     <div class="card-meta">
       <strong>${card.name}</strong>
-      <small>${card.code} · ${card.types.join(", ")}</small>
+      <small>${card.code} · ${card.rarity || (card.types || []).join(", ")}</small>
     </div>
   `;
   return tile;

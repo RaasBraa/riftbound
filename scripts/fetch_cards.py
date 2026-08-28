@@ -117,6 +117,171 @@ def slim_card(raw: dict) -> dict:
     }
 
 
+ATLAS_IMAGE = "https://assets.riftatlas-workers.com/riftbound/cards/original/{}.webp"
+SET_NAMES = {
+    "OGN": "Origins",
+    "SFD": "Spiritforged",
+    "UNL": "Unleashed",
+    "VEN": "Vendetta",
+}
+RUNE_DOMAINS = (
+    ("Fury", 1, 7),
+    ("Calm", 2, 42),
+    ("Mind", 3, 89),
+    ("Body", 4, 126),
+    ("Chaos", 5, 166),
+    ("Order", 6, 214),
+)
+
+
+def rune_printing(
+    *,
+    card_id: str,
+    name: str,
+    set_id: str,
+    code: str,
+    number: int | None,
+    rarity: str,
+    rarity_id: str,
+    domain: str,
+    image_code: str,
+    tags: list[str],
+    illustrator: list,
+) -> dict:
+    return {
+        "id": card_id,
+        "name": name,
+        "set": set_id,
+        "setName": SET_NAMES[set_id],
+        "code": code,
+        "number": number,
+        "types": ["Rune"],
+        "superTypes": ["Basic"],
+        "rarity": rarity,
+        "rarityId": rarity_id,
+        "domains": [domain],
+        "energy": None,
+        "might": None,
+        "power": None,
+        "mightBonus": None,
+        "tags": tags,
+        "text": "",
+        "effect": "",
+        "image": ATLAS_IMAGE.format(image_code),
+        "orientation": "portrait",
+        "illustrator": illustrator,
+    }
+
+
+def extra_rune_printings(official_cards: list[dict]) -> list[dict]:
+    """Set reprints and promo runes that the official gallery omits."""
+    have = {card["id"] for card in official_cards}
+    by_id = {card["id"]: card for card in official_cards}
+    extras: list[dict] = []
+
+    def add(card: dict) -> None:
+        if card["id"] not in have:
+            have.add(card["id"])
+            extras.append(card)
+
+    for domain, index, ogn_number in RUNE_DOMAINS:
+        base = by_id.get(f"ogn-{ogn_number:03d}-298") or {}
+        artists = base.get("illustrator") or []
+        name = f"{domain} Rune"
+        add(
+            rune_printing(
+                card_id=f"ogn-{ogn_number:03d}b-298",
+                name=name,
+                set_id="OGN",
+                code=f"OGN-{ogn_number:03d}b/298",
+                number=ogn_number,
+                rarity="Showcase",
+                rarity_id="showcase",
+                domain=domain,
+                image_code=f"OGN-{ogn_number:03d}B",
+                tags=["Promo"],
+                illustrator=artists,
+            )
+        )
+        for set_id in ("SFD", "UNL"):
+            add(
+                rune_printing(
+                    card_id=f"{set_id.lower()}-r{index:02d}",
+                    name=name,
+                    set_id=set_id,
+                    code=f"{set_id}-R{index:02d}",
+                    number=index,
+                    rarity="Common",
+                    rarity_id="common",
+                    domain=domain,
+                    image_code=f"{set_id}-R{index:02d}",
+                    tags=[],
+                    illustrator=artists,
+                )
+            )
+            add(
+                rune_printing(
+                    card_id=f"{set_id.lower()}-r{index:02d}a",
+                    name=name,
+                    set_id=set_id,
+                    code=f"{set_id}-R{index:02d}A",
+                    number=index,
+                    rarity="Showcase",
+                    rarity_id="showcase",
+                    domain=domain,
+                    image_code=f"SFD-R{index:02d}A",
+                    tags=[],
+                    illustrator=artists,
+                )
+            )
+            add(
+                rune_printing(
+                    card_id=f"{set_id.lower()}-r{index:02d}b",
+                    name=name,
+                    set_id=set_id,
+                    code=f"{set_id}-R{index:02d}B",
+                    number=index,
+                    rarity="Showcase",
+                    rarity_id="showcase",
+                    domain=domain,
+                    image_code=f"SFD-R{index:02d}B",
+                    tags=[],
+                    illustrator=artists,
+                )
+            )
+        add(
+            rune_printing(
+                card_id=f"ven-r{index:02d}a",
+                name=name,
+                set_id="VEN",
+                code=f"VEN-R{index:02d}A",
+                number=index,
+                rarity="Showcase",
+                rarity_id="showcase",
+                domain=domain,
+                image_code=f"VEN-R{index:02d}A",
+                tags=[],
+                illustrator=artists,
+            )
+        )
+        add(
+            rune_printing(
+                card_id=f"ven-r{index:02d}b",
+                name=name,
+                set_id="VEN",
+                code=f"VEN-R{index:02d}B",
+                number=index,
+                rarity="Promo",
+                rarity_id="promo",
+                domain=domain,
+                image_code=f"VEN-R{index:02d}B",
+                tags=["Promo"],
+                illustrator=artists,
+            )
+        )
+    return extras
+
+
 def main() -> None:
     html = fetch(GALLERY_URL).decode("utf-8", "ignore")
     match = re.search(r"/_next/static/([^/]+)/_buildManifest\.js", html)
@@ -139,6 +304,11 @@ def main() -> None:
     ]
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    extras = extra_rune_printings(cards)
+    if extras:
+        cards.extend(extras)
+        print(f"Added {len(extras)} extra rune printings not listed in the official gallery.")
+
     OUT_PATH.write_text(
         json.dumps({"source": GALLERY_URL, "buildId": build_id, "sets": sets, "cards": cards}, ensure_ascii=False),
         encoding="utf-8",
