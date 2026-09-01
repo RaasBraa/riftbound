@@ -39,13 +39,13 @@ This also adds rune reprints the official gallery skips (Spiritforged, Unleashed
 
 ## Collection value (local editor)
 
-Cardmarket.com blocks automated lookups. The local editor instead stores lowest **EU** listings (the Cardmarket-style “from” price) and links each card to Cardmarket search.
+The local editor stores **TCGplayer** prices from [RiftCompare](https://riftcompare.com/) (the US TCGplayer row, in USD). That is not Cardmarket and not the cheapest EU listing.
 
 ```bash
 python scripts/fetch_prices.py
 ```
 
-Or click **Refresh prices** while the local server is running. Restart the server once after this change. The **EU value** stat is copies × lowest EU listing. Sort by **EU value** to see the expensive cards first.
+Or click **Refresh prices** while the local server is running. The **TCG value** stat is copies × TCGplayer listing. Sort by **TCGplayer** to see the expensive cards first.
 
 ## Disclaimer
 

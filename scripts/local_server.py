@@ -60,10 +60,11 @@ class Handler(SimpleHTTPRequestHandler):
             scripts_dir = str(Path(__file__).resolve().parent)
             if scripts_dir not in sys.path:
                 sys.path.insert(0, scripts_dir)
-            from fetch_prices import write_prices
+            import importlib
+            import fetch_prices
 
             try:
-                payload = write_prices()
+                payload = importlib.reload(fetch_prices).write_prices()
             except Exception as error:
                 self._send_json(502, {"ok": False, "error": str(error)})
                 return
@@ -90,7 +91,7 @@ def main() -> None:
     print(f"Local editor:  http://127.0.0.1:{PORT}")
     print(f"Phone camera:  http://{lan_ip()}:{PORT}/intake.html")
     print("Type names or scan cards. collection.json updates automatically.")
-    print("Cardmarket values: click Refresh prices, or python scripts/fetch_prices.py")
+    print("TCGplayer values: click Refresh prices, or python scripts/fetch_prices.py")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

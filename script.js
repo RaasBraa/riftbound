@@ -57,19 +57,27 @@ function qty(id) {
 
 function priceCents(id) {
   const row = state.prices[id];
-  return row && row.eurCents != null ? Number(row.eurCents) : null;
+  if (!row) return null;
+  if (row.usdCents != null) return Number(row.usdCents);
+  return null;
 }
 
-function formatEur(cents) {
+function formatUsd(cents) {
   if (cents == null || Number.isNaN(cents)) return "—";
-  return (cents / 100).toLocaleString("da-DK", { style: "currency", currency: "EUR" });
+  return (cents / 100).toLocaleString("da-DK", { style: "currency", currency: "USD" });
 }
 
-function cardmarketUrl(card) {
+function tcgplayerUrl(card) {
   const row = state.prices[card.id];
-  if (row?.cardmarket) return row.cardmarket;
-  const query = encodeURIComponent(`${card.name} ${(card.code || "").split("/")[0]}`.trim());
-  return `https://www.cardmarket.com/en/Riftbound/Products/Search?searchString=${query}`;
+  if (row?.tcgplayer) return row.tcgplayer;
+  const query = encodeURIComponent(card.name || "");
+  return `https://www.tcgplayer.com/search/riftbound/product?q=${query}`;
+}
+
+function riftcompareUrl(card) {
+  const row = state.prices[card.id];
+  if (row?.riftcompare) return row.riftcompare;
+  return "https://riftcompare.com/";
 }
 
 function setQty(id, next) {
@@ -260,11 +268,11 @@ function updateStats(shownCount) {
       if (cents == null) unpriced += qty(id);
       else total += cents * qty(id);
     });
-    els.value.textContent = formatEur(total);
+    els.value.textContent = formatUsd(total);
     if (els.valueStat) {
       els.valueStat.title = unpriced
-        ? `${unpriced} owned copies have no EU listing yet`
-        : "Lowest EU listing × copies owned";
+        ? `${unpriced} owned copies have no TCGplayer listing yet`
+        : "TCGplayer listing on RiftCompare × copies owned";
     }
   }
 }
@@ -286,7 +294,7 @@ function cardTile(card) {
     </div>
     <div class="card-meta">
       <strong>${card.name}</strong>
-      <small>${card.code} · ${card.rarity || (card.types || []).join(", ")}${CAN_EDIT ? ` · ${formatEur(priceCents(card.id))}` : ""}</small>
+      <small>${card.code} · ${card.rarity || (card.types || []).join(", ")}${CAN_EDIT ? ` · ${formatUsd(priceCents(card.id))}` : ""}</small>
     </div>
   `;
   return tile;
@@ -328,7 +336,7 @@ function openModal(card) {
       <div class="facts">${facts.map((fact) => `<span>${fact}</span>`).join("")}</div>
       <div class="facts">${card.domains.map((domain) => `<span class="domain-pip">${domain}</span>`).join("")}</div>
       <p class="rules">${card.text || card.effect || "No rules text."}</p>
-      ${CAN_EDIT ? `<p class="rules">EU lowest ${formatEur(priceCents(card.id))} · <a href="${cardmarketUrl(card)}" target="_blank" rel="noreferrer">Cardmarket</a></p>` : ""}
+      ${CAN_EDIT ? `<p class="rules">TCGplayer ${formatUsd(priceCents(card.id))} · <a href="${tcgplayerUrl(card)}" target="_blank" rel="noreferrer">TCGplayer</a> · <a href="${riftcompareUrl(card)}" target="_blank" rel="noreferrer">RiftCompare</a></p>` : ""}
       ${card.illustrator?.length ? `<p class="rules">Art: ${card.illustrator.join(", ")}</p>` : ""}
       ${CAN_EDIT ? `
       <div class="modal-qty qty" data-id="${card.id}">
@@ -457,7 +465,7 @@ if (els.refreshPrices) {
   els.refreshPrices.addEventListener("click", async () => {
     els.refreshPrices.disabled = true;
     els.status.hidden = false;
-    els.status.textContent = "Refreshing EU prices… this can take about 15 seconds.";
+    els.status.textContent = "Refreshing TCGplayer prices… this can take about a minute.";
     try {
       const res = await fetch("/api/prices/refresh", { method: "POST" });
       const payload = await res.json();
