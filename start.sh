@@ -13,7 +13,7 @@ fi
 
 if ! pip3 show fastapi > /dev/null 2>&1; then
     echo "🐍 Installing Python dependencies..."
-    cd api && pip3 install -q -r requirements.txt && cd ..
+    (cd api && pip3 install -q -r requirements.txt)
 fi
 
 export PATH="/home/ubuntu/.local/bin:$HOME/.local/bin:$PATH"
@@ -30,7 +30,7 @@ echo ""
 
 trap 'kill 0' EXIT
 
-cd api && python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 &
-cd .. && npm run dev &
+(cd api && python3 -m uvicorn main:app --host 127.0.0.1 --port 8000) &
+npm run dev &
 
 wait

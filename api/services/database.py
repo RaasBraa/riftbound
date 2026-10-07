@@ -10,6 +10,7 @@ _db = None
 async def get_db():
     global _db
     if _db is None:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         _db = await aiosqlite.connect(str(DB_PATH))
         _db.row_factory = aiosqlite.Row
     return _db
