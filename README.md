@@ -1,6 +1,32 @@
 # Riftbound Archive
 
-A static online card database for [Riftbound](https://playriftbound.com/en-us/card-gallery). The GitHub Pages site is view-only. Counts live in `data/collection.json`.
+A static online card database for [Riftbound](https://playriftbound.com/en-us/card-gallery) with **business platform** for managing a small English-only Riftbound singles resale business.
+
+## 🆕 Business Platform (MVP)
+
+A local Next.js + Python platform for inventory management, deal finding, and P&L tracking:
+- **Collection & Inventory** – Track personal collection and business stock
+- **Deal Finder** – Scan Tradera and Cardmarket for underpriced English singles
+- **P&L Tracking** – Purchases, sales, and profit calculations
+
+**📖 [Full Business Platform Documentation →](./README_BUSINESS.md)**
+
+Quick start:
+```bash
+# Install dependencies
+npm install
+cd api && pip install -r requirements.txt && cd ..
+
+# Run (two terminals)
+npm run dev          # Terminal 1: Next.js UI at :3000
+npm run api          # Terminal 2: Python API at :8000
+```
+
+---
+
+## Legacy Gallery (GitHub Pages)
+
+The GitHub Pages site is view-only. Counts live in `data/collection.json`.
 
 ## Best way to add a lot of cards
 
