@@ -26,9 +26,6 @@ export default function DealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState('');
-  const [importingDealId, setImportingDealId] = useState<number | null>(null);
-  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     loadDeals();
@@ -40,12 +37,9 @@ export default function DealsPage() {
       if (res.ok) {
         const data = await res.json();
         setDeals(data.deals || []);
-        setError('');
-      } else {
-        setError('API unavailable. Check that the backend is running.');
       }
     } catch (error) {
-      setError('API unavailable. Check that the backend is running at :8000');
+      console.error('Failed to load deals:', error);
     } finally {
       setLoading(false);
     }
@@ -53,41 +47,15 @@ export default function DealsPage() {
 
   async function scanForDeals() {
     setScanning(true);
-    setError('');
     try {
       const res = await fetch('/api/v1/deals/scan', { method: 'POST' });
       if (res.ok) {
         await loadDeals();
-        setSuccessMessage('Scan complete!');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        const data = await res.json();
-        setError(data.detail || 'Failed to scan deals');
       }
     } catch (error) {
-      setError('API error: ' + error);
+      console.error('Failed to scan for deals:', error);
     } finally {
       setScanning(false);
-    }
-  }
-
-  async function importDeal(dealId: number) {
-    setImportingDealId(dealId);
-    setError('');
-    try {
-      const res = await fetch(`/api/v1/deals/${dealId}/import-purchase`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setSuccessMessage(`Deal imported as purchase #${data.purchaseId}!`);
-        setTimeout(() => setSuccessMessage(''), 5000);
-      } else {
-        const data = await res.json();
-        setError(data.detail || 'Failed to import deal');
-      }
-    } catch (error) {
-      setError('API error: ' + error);
-    } finally {
-      setImportingDealId(null);
     }
   }
 
@@ -103,14 +71,30 @@ export default function DealsPage() {
                 <Link href="/" className="text-xl font-bold text-gray-900">Riftbound Business</Link>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <Link href="/" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Dashboard</Link>
-                <Link href="/collection" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Collection</Link>
-                <Link href="/inventory" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Inventory</Link>
-                <Link href="/purchases" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Purchases</Link>
-                <Link href="/deals" className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Deals</Link>
-                <Link href="/sold" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Sold</Link>
-                <Link href="/settings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Settings</Link>
-                <Link href="/gallery" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Gallery</Link>
+                <Link href="/" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Dashboard
+                </Link>
+                <Link href="/collection" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Collection
+                </Link>
+                <Link href="/inventory" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Inventory
+                </Link>
+                <Link href="/purchases" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Purchases
+                </Link>
+                <Link href="/deals" className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Deals
+                </Link>
+                <Link href="/sold" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Sold
+                </Link>
+                <Link href="/settings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Settings
+                </Link>
+                <Link href="/gallery" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Gallery
+                </Link>
               </div>
             </div>
           </div>
@@ -242,7 +226,7 @@ export default function DealsPage() {
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Buy Price</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">CM EN Low</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Profit Est</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Scanned</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -281,16 +265,8 @@ export default function DealsPage() {
                               <span className="text-gray-400">—</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-center">
-                            {deal.detectedCardId && (
-                              <button
-                                onClick={() => importDeal(deal.id)}
-                                disabled={importingDealId === deal.id}
-                                className="text-sm text-green-600 hover:text-green-700 disabled:opacity-50"
-                              >
-                                {importingDealId === deal.id ? 'Importing...' : 'Import'}
-                              </button>
-                            )}
+                          <td className="px-6 py-4 text-right text-sm text-gray-500">
+                            {new Date(deal.scannedAt).toLocaleTimeString()}
                           </td>
                         </tr>
                       ))}
