@@ -7,3 +7,25 @@ Thumbs.db
 __pycache__/
 .vscode/
 .idea/
+
+# Next.js
+/.next/
+/out/
+/build
+node_modules/
+.next
+*.log
+.env*.local
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Business platform
+/data/business.db
+/data/business.db-journal
