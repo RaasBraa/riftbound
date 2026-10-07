@@ -90,6 +90,7 @@ def main() -> None:
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"Local editor:  http://127.0.0.1:{PORT}")
     print(f"Phone camera:  http://{lan_ip()}:{PORT}/intake.html")
+    print(f"Seller lot:    http://127.0.0.1:{PORT}/lot.html")
     print("Type names or scan cards. collection.json updates automatically.")
     print("TCGplayer values: click Refresh prices, or python scripts/fetch_prices.py")
     try:

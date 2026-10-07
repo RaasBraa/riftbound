@@ -37,6 +37,7 @@ python scripts/local_server.py
 ```
 
 - Computer: http://127.0.0.1:4173/intake.html
+- Seller lot: http://127.0.0.1:4173/lot.html
 - Phone camera on the same Wi‑Fi: the terminal prints a `Phone camera` URL
 
 **Fastest for ~1000 cards:** sort the pile, type the first few letters of the name, press Enter. Repeat. Undo is there if you miss.
@@ -62,6 +63,10 @@ python scripts/fetch_cards.py
 ```
 
 This also adds rune reprints the official gallery skips (Spiritforged, Unleashed, Vendetta showcase/promo, and Origins `b` promos). Commit `data/cards.json` and push.
+
+## Value a seller lot
+
+Open http://127.0.0.1:4173/lot.html and drop listing photos (Tradera screenshots work). It reads card names from the pictures, totals TCGplayer, and does not touch `collection.json`. Check the list — blurry names and two photos of the same pile need a quick pass by hand.
 
 ## Collection value (local editor)
 

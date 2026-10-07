@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Seller lot · Ras's Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="intake.css?v=4">
+    <link rel="stylesheet" href="lot.css?v=2">
+</head>
+<body class="is-open can-edit">
+    <div class="atmosphere" aria-hidden="true">
+        <span class="orb orb-a"></span>
+        <span class="orb orb-c"></span>
+        <span class="grain"></span>
+    </div>
+
+    <main class="intake lot-page">
+        <p class="eyebrow"><span class="mini-seal">RB</span> Seller lot</p>
+        <h1>Value a listing</h1>
+        <p class="tagline">Drop photos from a Tradera ad (or any seller). The reader looks for every card name it can see, then totals TCGplayer. It does not change your collection.</p>
+        <p><a href="index.html">← Back to archive</a> · <a href="intake.html">Card intake</a></p>
+        <p id="offline" class="status" hidden>Start the local editor first: <code>python scripts/local_server.py</code></p>
+
+        <section class="intake-panel">
+            <label class="lot-drop" id="dropzone">
+                <strong>Drop photos here</strong>
+                <span>or tap to pick screenshots from the listing. Several pictures is fine.</span>
+                <input id="photoInput" type="file" accept="image/*" multiple>
+            </label>
+            <div class="lot-thumbs" id="thumbs"></div>
+            <p id="scanStatus" class="status">Sharp photos of the card names work best. Same pile shot twice will double-count until you delete the extras.</p>
+        </section>
+
+        <section class="lot-stats" id="lotStats">
+            <div class="stat"><span id="statPhotos">0</span><label>Photos</label></div>
+            <div class="stat"><span id="statCards">0</span><label>Cards</label></div>
+            <div class="stat"><span id="statCopies">0</span><label>Copies</label></div>
+            <div class="stat"><span id="statValue">—</span><label>TCG value</label></div>
+        </section>
+
+        <section class="intake-panel" id="unsurePanel" hidden>
+            <h2>Not sure</h2>
+            <p class="tagline">Tap the right card, or skip. These lines were messy.</p>
+            <div id="unsureList" class="unsure-list"></div>
+        </section>
+
+        <section class="intake-panel">
+            <h2>In this lot</h2>
+            <label class="search-wrap">
+                <span class="visually-hidden">Add a missed card</span>
+                <input id="addSearch" class="search" type="search" placeholder="Add a missed card by name" autocomplete="off">
+            </label>
+            <div id="suggestions" class="suggestions"></div>
+            <div id="lotList" class="lot-list"></div>
+            <p id="emptyLot" class="tagline">No cards yet. Upload a photo or type a name.</p>
+            <div class="camera-actions">
+                <button id="clearLot" type="button" disabled>Clear lot</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="lot.js?v=7"></script>
+</body>
+</html>

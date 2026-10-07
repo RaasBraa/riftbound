@@ -1,0 +1,185 @@
+.lot-page {
+    max-width: 860px;
+}
+
+.lot-drop {
+    position: relative;
+    display: grid;
+    gap: 0.35rem;
+    place-items: center;
+    min-height: 148px;
+    padding: 1.2rem;
+    border: 1px dashed var(--line);
+    border-radius: 16px;
+    background: #0c0a10;
+    text-align: center;
+    cursor: pointer;
+    color: var(--muted);
+}
+
+.lot-drop strong {
+    color: var(--ink);
+    font-size: 1.05rem;
+}
+
+.lot-drop input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.lot-drop.is-over {
+    border-color: var(--copper);
+    background: #1c161f;
+}
+
+.lot-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+.lot-thumb {
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #07090d;
+}
+
+.lot-thumb img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+}
+
+.lot-thumb figcaption {
+    padding: 0.3rem 0.4rem 0.4rem;
+    color: var(--muted);
+    font-size: 0.68rem;
+}
+
+.lot-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-top: 1.1rem;
+}
+
+.lot-list {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.9rem;
+}
+
+.lot-row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto auto;
+    gap: 0.7rem;
+    align-items: center;
+    padding: 0.45rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #161018;
+}
+
+.lot-row img {
+    width: 64px;
+    height: 88px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+}
+
+.lot-row strong {
+    display: block;
+}
+
+.lot-row small {
+    color: var(--muted);
+}
+
+.lot-row .qty {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.lot-row .qty button,
+.lot-row .remove {
+    min-width: 36px;
+    min-height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #120e16;
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.lot-row .line-value {
+    min-width: 5.5rem;
+    text-align: right;
+    font-weight: 700;
+    color: var(--copper-strong);
+}
+
+.unsure-list {
+    display: grid;
+    gap: 0.7rem;
+    margin-top: 0.7rem;
+}
+
+.unsure-item {
+    padding: 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #120e16;
+}
+
+.unsure-item p {
+    margin: 0 0 0.55rem;
+    color: var(--muted);
+}
+
+.unsure-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.unsure-picks button,
+.unsure-item .skip {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: #161018;
+    color: var(--ink);
+    font: inherit;
+    border-radius: 12px;
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+}
+
+@media (max-width: 800px) {
+    .lot-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .lot-row {
+        grid-template-columns: 56px minmax(0, 1fr);
+    }
+
+    .lot-row .qty,
+    .lot-row .line-value {
+        grid-column: 2;
+    }
+
+    .lot-row .line-value {
+        text-align: left;
+    }
+}
