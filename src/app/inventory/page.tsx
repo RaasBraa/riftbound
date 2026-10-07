@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { AppShell } from '@/components/AppShell';
+import { PageHeader } from '@/components/PageHeader';
+import { Spinner } from '@/components/Spinner';
+import { EmptyState } from '@/components/EmptyState';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Modal } from '@/components/Modal';
+import { StatusBadge } from '@/components/StatusBadge';
+import { useToast } from '@/components/Toast';
+import { apiJson, parseNonNegative } from '@/lib/api';
 
 interface InventoryLot {
   id: number;
@@ -14,21 +22,30 @@ interface InventoryLot {
   purchasedAt: string;
   status: 'owned' | 'listed' | 'sold' | 'reserved';
   source?: string;
+  notes?: string;
 }
 
 export default function InventoryPage() {
+  const { toast } = useToast();
   const [inventory, setInventory] = useState<InventoryLot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showSaleModal, setShowSaleModal] = useState(false);
-  const [selectedLot, setSelectedLot] = useState<InventoryLot | null>(null);
-  
+  const [saving, setSaving] = useState(false);
+  const [saleLot, setSaleLot] = useState<InventoryLot | null>(null);
+  const [editLot, setEditLot] = useState<InventoryLot | null>(null);
+  const [removeLot, setRemoveLot] = useState<InventoryLot | null>(null);
   const [saleData, setSaleData] = useState({
     salePriceSek: 0,
     platform: 'Cardmarket',
     platformFeesSek: 0,
     shippingSek: 0,
     buyerNotes: '',
+  });
+  const [editForm, setEditForm] = useState({
+    qty: 1,
+    condition: 'NM',
+    status: 'owned',
+    notes: '',
+    costBasisSek: 0,
   });
 
   useEffect(() => {
@@ -37,326 +54,249 @@ export default function InventoryPage() {
 
   async function loadInventory() {
     try {
-      const res = await fetch('/api/v1/inventory');
-      if (res.ok) {
-        const data = await res.json();
-        setInventory(data.lots || []);
-        setError('');
-      } else {
-        setError('API unavailable. Check that the backend is running.');
-      }
+      const data = await apiJson<{ lots: InventoryLot[] }>('/api/v1/inventory');
+      setInventory(data.lots || []);
     } catch (error) {
-      setError('API unavailable. Check that the backend is running at :8000');
+      toast('error', error instanceof Error ? error.message : 'API unavailable at :8000');
     } finally {
       setLoading(false);
     }
   }
 
   async function updateStatus(lotId: number, newStatus: string) {
+    setSaving(true);
     try {
-      const res = await fetch(`/api/v1/inventory/${lotId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (res.ok) {
-        await loadInventory();
-        setError('');
-      } else {
-        const data = await res.json();
-        setError(data.detail || 'Failed to update status');
-      }
+      await apiJson(`/api/v1/inventory/${lotId}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+      toast('success', 'Status updated');
+      await loadInventory();
     } catch (error) {
-      setError('API error: ' + error);
+      toast('error', error instanceof Error ? error.message : 'Failed to update status');
+    } finally {
+      setSaving(false);
     }
-  }
-
-  function openSaleModal(lot: InventoryLot) {
-    setSelectedLot(lot);
-    setSaleData({
-      salePriceSek: 0,
-      platform: 'Cardmarket',
-      platformFeesSek: 0,
-      shippingSek: 0,
-      buyerNotes: '',
-    });
-    setShowSaleModal(true);
   }
 
   async function submitSale() {
-    if (!selectedLot || saleData.salePriceSek <= 0) {
-      setError('Please enter a valid sale price');
+    if (!saleLot || parseNonNegative(saleData.salePriceSek) === null || saleData.salePriceSek <= 0) {
+      toast('error', 'Enter a valid sale price');
       return;
     }
-
+    if (parseNonNegative(saleData.platformFeesSek) === null || parseNonNegative(saleData.shippingSek) === null) {
+      toast('error', 'Fees and shipping cannot be negative');
+      return;
+    }
+    setSaving(true);
     try {
-      const res = await fetch('/api/v1/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inventoryId: selectedLot.id,
-          ...saleData,
-        }),
-      });
-
-      if (res.ok) {
-        setShowSaleModal(false);
-        setSelectedLot(null);
-        await loadInventory();
-        setError('');
-      } else {
-        const data = await res.json();
-        setError(data.detail || 'Failed to record sale');
-      }
+      await apiJson('/api/v1/sales', { method: 'POST', body: JSON.stringify({ inventoryId: saleLot.id, ...saleData }) });
+      toast('success', 'Sale recorded');
+      setSaleLot(null);
+      await loadInventory();
     } catch (error) {
-      setError('API error: ' + error);
+      toast('error', error instanceof Error ? error.message : 'Failed to record sale');
+    } finally {
+      setSaving(false);
     }
   }
 
-  const statusColors = {
-    owned: 'bg-green-100 text-green-800',
-    listed: 'bg-blue-100 text-blue-800',
-    sold: 'bg-gray-100 text-gray-800',
-    reserved: 'bg-yellow-100 text-yellow-800',
-  };
+  async function saveEdit() {
+    if (!editLot) return;
+    if (editForm.qty < 1 || parseNonNegative(editForm.costBasisSek) === null) {
+      toast('error', 'Qty must be ≥ 1 and cost cannot be negative');
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiJson(`/api/v1/inventory/${editLot.id}`, { method: 'PATCH', body: JSON.stringify(editForm) });
+      toast('success', 'Lot updated');
+      setEditLot(null);
+      await loadInventory();
+    } catch (error) {
+      toast('error', error instanceof Error ? error.message : 'Failed to update lot');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!removeLot) return;
+    setSaving(true);
+    try {
+      await apiJson(`/api/v1/inventory/${removeLot.id}`, { method: 'DELETE' });
+      toast('success', 'Lot deleted');
+      setRemoveLot(null);
+      await loadInventory();
+    } catch (error) {
+      toast('error', error instanceof Error ? error.message : 'Failed to delete lot');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const totalValue = inventory
     .filter((lot) => lot.status === 'owned' || lot.status === 'listed')
     .reduce((sum, lot) => sum + lot.costBasisSek * lot.qty, 0);
 
+  const liveProfit = saleLot
+    ? saleData.salePriceSek - saleData.platformFeesSek - saleData.shippingSek - saleLot.costBasisSek * saleLot.qty
+    : 0;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <Link href="/" className="text-xl font-bold text-gray-900">Riftbound Business</Link>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <Link href="/" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Dashboard</Link>
-                <Link href="/collection" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Collection</Link>
-                <Link href="/inventory" className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Inventory</Link>
-                <Link href="/purchases" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Purchases</Link>
-                <Link href="/deals" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Deals</Link>
-                <Link href="/sold" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Sold</Link>
-                <Link href="/settings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Settings</Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <AppShell currentPage="Inventory">
+      <PageHeader title="Business Inventory" subtitle={`On-hand cost: ${totalValue.toFixed(2)} SEK`} />
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-3xl font-bold text-gray-900">Business Inventory</h2>
-            <div className="text-sm text-gray-500">
-              Total value: {totalValue.toFixed(2)} SEK
-            </div>
-          </div>
-
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-              <p className="mt-2 text-gray-500">Loading inventory...</p>
-            </div>
-          ) : inventory.length === 0 ? (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
-              <p className="text-gray-500">No inventory lots yet.</p>
-              <p className="text-sm text-gray-400 mt-2">Add purchases to track your business inventory.</p>
-            </div>
-          ) : (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Condition</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost Basis</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {inventory.map((lot) => (
-                    <tr key={lot.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{lot.cardName}</div>
-                        <div className="text-sm text-gray-500">{lot.cardCode}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.condition}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{lot.qty}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{lot.costBasisSek.toFixed(2)} SEK</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[lot.status]}`}>
-                          {lot.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {lot.status === 'owned' && (
-                          <button
-                            onClick={() => updateStatus(lot.id, 'listed')}
-                            className="text-indigo-600 hover:text-indigo-900 mr-3"
-                          >
-                            Mark Listed
-                          </button>
-                        )}
-                        {(lot.status === 'owned' || lot.status === 'listed') && (
-                          <button
-                            onClick={() => openSaleModal(lot)}
-                            className="text-green-600 hover:text-green-900"
-                          >
-                            Record Sale
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Sale Modal */}
-      {showSaleModal && selectedLot && (
-        <div className="fixed z-10 inset-0 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowSaleModal(false)}></div>
-
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                  Record Sale
-                </h3>
-                <div className="mb-4 p-3 bg-gray-50 rounded">
-                  <div className="text-sm font-medium text-gray-900">{selectedLot.cardName}</div>
-                  <div className="text-sm text-gray-500">{selectedLot.cardCode} • {selectedLot.qty}x • {selectedLot.condition}</div>
-                  <div className="text-sm text-gray-500">Cost basis: {(selectedLot.costBasisSek * selectedLot.qty).toFixed(2)} SEK</div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Sale Price (SEK) *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={saleData.salePriceSek}
-                      onChange={(e) => setSaleData({ ...saleData, salePriceSek: parseFloat(e.target.value) })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Platform</label>
-                    <select
-                      value={saleData.platform}
-                      onChange={(e) => setSaleData({ ...saleData, platform: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
-                    >
-                      <option>Cardmarket</option>
-                      <option>Tradera</option>
-                      <option>Facebook</option>
-                      <option>Local</option>
-                      <option>Other</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Platform Fees (SEK)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={saleData.platformFeesSek}
-                      onChange={(e) => setSaleData({ ...saleData, platformFeesSek: parseFloat(e.target.value) })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Shipping (SEK)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={saleData.shippingSek}
-                      onChange={(e) => setSaleData({ ...saleData, shippingSek: parseFloat(e.target.value) })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Buyer Notes</label>
-                    <textarea
-                      value={saleData.buyerNotes}
-                      onChange={(e) => setSaleData({ ...saleData, buyerNotes: e.target.value })}
-                      rows={2}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
-                    />
-                  </div>
-
-                  {saleData.salePriceSek > 0 && (
-                    <div className="p-3 bg-blue-50 rounded">
-                      <div className="text-sm text-gray-700">
-                        <div className="flex justify-between">
-                          <span>Sale price:</span>
-                          <span className="font-medium">{saleData.salePriceSek.toFixed(2)} SEK</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>- Platform fees:</span>
-                          <span>{saleData.platformFeesSek.toFixed(2)} SEK</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>- Shipping:</span>
-                          <span>{saleData.shippingSek.toFixed(2)} SEK</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>- Cost basis:</span>
-                          <span>{(selectedLot.costBasisSek * selectedLot.qty).toFixed(2)} SEK</span>
-                        </div>
-                        <div className="flex justify-between font-semibold text-gray-900 border-t mt-2 pt-2">
-                          <span>Profit:</span>
-                          <span className={
-                            (saleData.salePriceSek - saleData.platformFeesSek - saleData.shippingSek - (selectedLot.costBasisSek * selectedLot.qty)) >= 0
-                              ? 'text-green-600'
-                              : 'text-red-600'
-                          }>
-                            {(saleData.salePriceSek - saleData.platformFeesSek - saleData.shippingSek - (selectedLot.costBasisSek * selectedLot.qty)).toFixed(2)} SEK
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  onClick={submitSale}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Record Sale
-                </button>
-                <button
-                  onClick={() => setShowSaleModal(false)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
+      {loading ? (
+        <Spinner label="Loading inventory..." />
+      ) : inventory.length === 0 ? (
+        <EmptyState title="No inventory lots yet" body="Add a purchase to track business stock." href="/purchases" cta="Add purchase" />
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Card</th>
+                <th>Condition</th>
+                <th>Qty</th>
+                <th>Cost Basis</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {inventory.map((lot) => (
+                <tr key={lot.id}>
+                  <td>
+                    <div className="font-medium">{lot.cardName}</div>
+                    <div className="text-muted text-xs">{lot.cardCode}</div>
+                  </td>
+                  <td>{lot.condition}</td>
+                  <td>{lot.qty}</td>
+                  <td>{lot.costBasisSek.toFixed(2)} SEK</td>
+                  <td><StatusBadge status={lot.status} /></td>
+                  <td className="space-x-2 whitespace-nowrap">
+                    {lot.status === 'owned' && (
+                      <button className="btn-ghost" disabled={saving} onClick={() => updateStatus(lot.id, 'listed')}>Mark Listed</button>
+                    )}
+                    {(lot.status === 'owned' || lot.status === 'listed') && (
+                      <button
+                        className="btn-ghost"
+                        onClick={() => {
+                          setSaleLot(lot);
+                          setSaleData({ salePriceSek: 0, platform: 'Cardmarket', platformFeesSek: 0, shippingSek: 0, buyerNotes: '' });
+                        }}
+                      >
+                        Record Sale
+                      </button>
+                    )}
+                    {lot.status !== 'sold' && (
+                      <>
+                        <button
+                          className="btn-ghost"
+                          onClick={() => {
+                            setEditLot(lot);
+                            setEditForm({
+                              qty: lot.qty,
+                              condition: lot.condition,
+                              status: lot.status,
+                              notes: lot.notes || '',
+                              costBasisSek: lot.costBasisSek,
+                            });
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button className="btn-ghost text-danger" onClick={() => setRemoveLot(lot)}>Delete</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </div>
+
+      <Modal open={!!saleLot} title="Record Sale" onClose={() => setSaleLot(null)}>
+        {saleLot && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted">{saleLot.cardName} • {saleLot.qty}× • cost {(saleLot.costBasisSek * saleLot.qty).toFixed(2)} SEK</p>
+            <div>
+              <label className="label">Sale Price (SEK) *</label>
+              <input className="input" type="number" min="0" step="0.01" value={saleData.salePriceSek} onChange={(e) => setSaleData({ ...saleData, salePriceSek: parseFloat(e.target.value) })} />
+            </div>
+            <div>
+              <label className="label">Platform</label>
+              <select className="input" value={saleData.platform} onChange={(e) => setSaleData({ ...saleData, platform: e.target.value })}>
+                <option>Cardmarket</option><option>Tradera</option><option>Facebook</option><option>Local</option><option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Platform Fees (SEK)</label>
+              <input className="input" type="number" min="0" step="0.01" value={saleData.platformFeesSek} onChange={(e) => setSaleData({ ...saleData, platformFeesSek: parseFloat(e.target.value) })} />
+            </div>
+            <div>
+              <label className="label">Shipping (SEK)</label>
+              <input className="input" type="number" min="0" step="0.01" value={saleData.shippingSek} onChange={(e) => setSaleData({ ...saleData, shippingSek: parseFloat(e.target.value) })} />
+            </div>
+            <div>
+              <label className="label">Buyer Notes</label>
+              <textarea className="input" rows={2} value={saleData.buyerNotes} onChange={(e) => setSaleData({ ...saleData, buyerNotes: e.target.value })} />
+            </div>
+            {saleData.salePriceSek > 0 && (
+              <p className={`text-sm font-semibold ${liveProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                Profit: {liveProfit.toFixed(2)} SEK
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setSaleLot(null)}>Cancel</button>
+              <button className="btn-primary" disabled={saving} onClick={submitSale}>{saving ? 'Saving...' : 'Record Sale'}</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!editLot} title="Edit lot" onClose={() => setEditLot(null)}>
+        <div className="space-y-3">
+          <div>
+            <label className="label">Qty</label>
+            <input className="input" type="number" min="1" value={editForm.qty} onChange={(e) => setEditForm({ ...editForm, qty: parseInt(e.target.value, 10) })} />
+          </div>
+          <div>
+            <label className="label">Condition</label>
+            <select className="input" value={editForm.condition} onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}>
+              <option>NM</option><option>EX</option><option>VG</option><option>G</option><option>P</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <select className="input" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+              <option value="owned">owned</option>
+              <option value="listed">listed</option>
+              <option value="reserved">reserved</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Cost basis / card (SEK)</label>
+            <input className="input" type="number" min="0" step="0.01" value={editForm.costBasisSek} onChange={(e) => setEditForm({ ...editForm, costBasisSek: parseFloat(e.target.value) })} />
+          </div>
+          <div>
+            <label className="label">Notes</label>
+            <input className="input" value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary" onClick={() => setEditLot(null)}>Cancel</button>
+            <button className="btn-primary" disabled={saving} onClick={saveEdit}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!removeLot}
+        title="Delete lot?"
+        message="This removes the inventory lot. Lots with a recorded sale cannot be deleted."
+        busy={saving}
+        onCancel={() => setRemoveLot(null)}
+        onConfirm={confirmDelete}
+      />
+    </AppShell>
   );
 }

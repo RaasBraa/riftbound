@@ -16,10 +16,22 @@ async def get_db():
     return _db
 
 
+async def _column_names(db, table: str):
+    cursor = await db.execute(f"PRAGMA table_info({table})")
+    rows = await cursor.fetchall()
+    return {row[1] for row in rows}
+
+
+async def _ensure_column(db, table: str, column: str, ddl: str):
+    cols = await _column_names(db, table)
+    if column not in cols:
+        await db.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
 async def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
-    
+
     await db.execute("""
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +47,7 @@ async def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    
+
     await db.execute("""
         CREATE TABLE IF NOT EXISTS purchases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +62,7 @@ async def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    
+
     await db.execute("""
         CREATE TABLE IF NOT EXISTS purchase_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +76,7 @@ async def init_db():
             FOREIGN KEY (purchase_id) REFERENCES purchases(id)
         )
     """)
-    
+
     await db.execute("""
         CREATE TABLE IF NOT EXISTS deals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +98,7 @@ async def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    
+
     await db.execute("""
         CREATE TABLE IF NOT EXISTS sales (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,10 +113,13 @@ async def init_db():
             FOREIGN KEY (inventory_id) REFERENCES inventory(id)
         )
     """)
-    
+
+    await _ensure_column(db, "inventory", "purchase_id", "purchase_id INTEGER")
+    await _ensure_column(db, "inventory", "notes", "notes TEXT")
+
     await db.commit()
     await db.close()
-    
+
     global _db
     _db = await aiosqlite.connect(str(DB_PATH))
     _db.row_factory = aiosqlite.Row

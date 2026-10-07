@@ -3,12 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #4f46e5;
+  --danger: #dc2626;
+  --success: #16a34a;
+}
+
+.dark {
+  --background: #0b1220;
+  --surface: #151c2c;
+  --border: #2a3548;
+  --text: #e8eef7;
+  --muted: #94a3b8;
+  --accent: #818cf8;
+  --danger: #f87171;
+  --success: #4ade80;
 }
 
 body {
-  color: var(--foreground);
+  color: var(--text);
   background: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -20,4 +37,49 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium text-white bg-accent hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium border border-border bg-surface text-text hover:bg-background disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium text-white bg-danger hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-muted hover:text-text hover:bg-background disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+  }
+  .input {
+    @apply mt-1 block w-full border border-border rounded-md bg-surface text-text py-2 px-3 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent;
+  }
+  .label {
+    @apply block text-sm font-medium text-text;
+  }
+  .helper {
+    @apply mt-1 text-sm text-muted;
+  }
+  .card {
+    @apply bg-surface border border-border rounded-lg shadow-sm;
+  }
+  .table-wrap {
+    @apply overflow-x-auto card;
+  }
+  .data-table {
+    @apply min-w-full divide-y divide-border text-sm;
+  }
+  .data-table thead {
+    @apply bg-background sticky top-0;
+  }
+  .data-table th {
+    @apply px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider;
+  }
+  .data-table td {
+    @apply px-4 py-3 text-text;
+  }
+  .data-table tbody tr {
+    @apply hover:bg-background;
+  }
 }

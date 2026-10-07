@@ -1,0 +1,13 @@
+{
+  "demo_mode": true,
+  "min_profit_sek": 20.0,
+  "default_shipping_sek": 30.0,
+  "cardmarket_fee_percent": 10.0,
+  "tradera_fee_percent": 8.0,
+  "ask_to_sold_factor": 0.9,
+  "ollama_base_url": "http://127.0.0.1:11434",
+  "ollama_text_model": "llama3.2",
+  "ollama_vision_model": "llava",
+  "ollama_enabled": false,
+  "min_match_confidence": 0.55
+}

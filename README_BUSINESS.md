@@ -98,6 +98,8 @@ Then open your browser to:
 - **Legacy Gallery:** http://localhost:3000/gallery or http://localhost:3000/index.html
 - **API Docs:** http://127.0.0.1:8000/docs
 
+Dark mode follows the OS by default. Toggle it in the nav bar or Settings (stored in `localStorage`).
+
 ### Alternative: Using npm scripts
 ```bash
 # Terminal 1
@@ -149,36 +151,50 @@ Navigate to **Collection** to see cards from your existing `data/collection.json
 
 ### Track Purchases
 1. Navigate to **Purchases**
-2. Click "Add Purchase" (TODO: UI form)
+2. Click **Add Purchase**
 3. Enter vendor, items, costs, shipping, fees
 4. System creates inventory lots and calculates P&L
+5. Edit vendor/notes/shipping/fees, or delete (cascades unsold lots; blocked if any lot is sold)
+
+### Inventory & Sold
+- **Inventory:** edit qty/condition/status/notes/cost, mark listed, record sale, or delete (blocked if a sale exists)
+- **Sold:** edit price/fees/shipping (profit recalculates live) or delete a sale (lot returns to owned)
 
 ### Find Deals
 1. Navigate to **Deals**
 2. Click **Scan for Deals**
-3. System scrapes Tradera/Cardmarket for Riftbound listings
-4. Matches cards using fuzzy text matching
-5. Calculates expected profit based on Cardmarket EN comps
-6. Filters to English-only when possible
-7. Sorts by profit potential
+3. Demo mode loads fixtures (default). Live mode (demo off) scrapes Tradera and Cardmarket EN comps
+4. If Ollama is enabled, each listing is identified with a vision or text model, then matched to `data/cards.json`
+5. Non-English / non-Riftbound / low-confidence hits are dropped
+6. Expected profit uses fee and shipping settings
+7. Remove a row or **Clear all**; **Import as Purchase** still creates stock
 
 ### Demo Mode
-By default, the platform runs in **demo mode** with fixture data:
-- Shows example deals without live scraping
+By default, the platform runs in **demo mode** (`demo_mode: true` in `data/settings.json`):
+- Shows example deals without live scraping or Ollama
 - Safe for testing UI without hitting real sites
-- Set `DEMO_MODE=false` in `.env.local` to enable live scraping
+- Turn Demo Mode off in Settings to enable live scraping
 
 ## AI Card Matching
 
 ### Text Matching (Always Available)
-- Fuzzy matching using RapidFuzz
-- Searches card names in listing titles
-- Confidence scoring (threshold: 75%)
+- Exact card code when present, then RapidFuzz names
+- Confidence must meet `minMatchConfidence` (default 0.55)
 
-### Vision API (Optional)
-- Set `VISION_API_KEY` environment variable
-- Matches card images to catalog
-- Fallback to text matching if unavailable
+### Ollama (optional, local only)
+Live scrape + Ollama run only when **demo mode is off** and **Ollama is enabled** in Settings.
+
+```bash
+ollama serve
+ollama pull llama3.2          # or your Settings text model
+ollama pull llava             # or your Settings vision model
+```
+
+- Default URL: `http://127.0.0.1:11434`
+- Vision model is used when the listing has an image URL; otherwise the text model
+- Strict JSON: `cardName`, `cardCode?`, `set?`, `language`, `conditionGuess?`, `confidence`, `isRiftbound`, `isEnglish`
+- Scan UI shows progress; if Ollama is down you get **Ollama unreachable**
+- Aquitaz and TCGPlayer scrapers stay stubbed
 
 ## Scraper Notes
 
@@ -235,32 +251,35 @@ rm data/business.db
 
 ### API Endpoints
 - `GET /api/v1/health` – Health check
-- `GET /api/v1/inventory` – List inventory lots
-- `GET /api/v1/purchases` – List purchases
-- `GET /api/v1/deals` – List deal candidates
-- `POST /api/v1/deals/scan` – Scan for new deals
+- `GET /api/v1/settings` · `PUT /api/v1/settings`
+- `GET /api/v1/inventory` · `PATCH /api/v1/inventory/{id}` · `DELETE /api/v1/inventory/{id}`
+- `GET/POST /api/v1/purchases` · `GET/PATCH/DELETE /api/v1/purchases/{id}`
+- `GET/POST /api/v1/sales` · `PATCH/DELETE /api/v1/sales/{id}`
+- `GET /api/v1/deals` · `DELETE /api/v1/deals` · `DELETE /api/v1/deals/{id}`
+- `POST /api/v1/deals/scan` · `GET /api/v1/deals/scan/status`
+- `GET /api/v1/stats`
 
 See full API docs at http://127.0.0.1:8000/docs when running.
+
+```bash
+python test_api.py   # requires API on :8000; skips live Ollama
+```
 
 ## Remaining Work / Known Limitations
 
 ### MVP Scope
-- ✅ Collection display from existing data
-- ✅ Database schema for business tracking
-- ✅ UI for inventory, purchases, deals
+- ✅ Collection display from existing data (read-only; not merged into inventory)
+- ✅ Editable purchases, inventory, sales, and deals
+- ✅ Dark mode
 - ✅ Demo mode with fixture data
-- ⚠️ Scrapers are stubs (demo mode works, live scraping needs implementation)
-- ⚠️ No UI forms for adding purchases yet (API endpoints exist)
-- ⚠️ Vision API matching is stubbed (text matching works)
-- ⚠️ P&L calculations in progress
+- ✅ Local Ollama matching when demo is off
+- ⚠️ Live Tradera/Cardmarket HTML is still site-structure dependent
+- ⚠️ Aquitaz / TCGPlayer scrapers remain stubs
 
 ### Next Steps
-1. Implement live Tradera scraper (requires HTML structure investigation)
-2. Implement Cardmarket EN price scraper
-3. Add UI forms for purchases/sales
-4. Integrate vision API for image matching
-5. Add export/reporting features
-6. Implement bulk import from Tradera/Cardmarket CSVs
+1. Harden live Tradera and Cardmarket parsers as those sites change
+2. Optional bulk CSV import
+3. Export / reporting
 
 ## Legal & Ethics
 
